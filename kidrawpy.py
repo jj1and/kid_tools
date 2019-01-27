@@ -80,10 +80,15 @@ class Kidraw():
         ax_IQ.scatter(self.xc, self.yc, label='circle center', color='k')
 
         if(self.fine_fitting_flag==False):
-            IQ = fn.t21_func(np.linspace(self.gao_obj.fine_fit_range[0], self.gao_obj.fine_fit_range[1], 100), self.gao_obj.lmfit_result.params)
+            fit_f = np.linspace(self.gao_obj.fine_fit_range[0], self.gao_obj.fine_fit_range[1], 100)
+            IQ = fn.t21_func(fit_f, self.gao_obj.lmfit_result.params)
             fit_I = np.real(IQ)
             fit_Q = np.imag(IQ)
+            fit_x, fit_y = self.gao_obj.remove_tau_effect(fit_I, fit_Q, fit_f, self.tau)
+            fit_xc_c, fit_yc_c = self.gao_obj.set_data_default_position(fit_I, fit_Q, fit_f)
             ax_IQ.plot(fit_I, fit_Q, label="fit_I/Q", color='y')
+            ax_IQ.plot(fit_x, fit_y, label="fit_I/Q (removed tau)", color='y', linestyle=':')
+            ax_IQ.plot(fit_xc_c, fit_yc_c, label="fit_I/Q (centered)", color='y', linestyle='-.')
         else:
             pass
 

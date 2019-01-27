@@ -1,4 +1,5 @@
 import sys
+import csv
 import numpy as np
 from . import functions as fn
 from . import utilfunctions as util
@@ -71,6 +72,68 @@ class Gao():
             r = circle_params_dict['r']
 
         return tau, xc, yc, r, fr, Qr, phi_0
+
+    def save_fine_fit_params(self, save_fname1='fine_fit_params.csv', save_fname2='fine_fit_circle_params.csv'):
+        try:
+            with open(self.save_dir+save_fname1, 'w', newline="") as f:
+                csv_header = ['para_name', 'value', 'sigma', 'init_val']
+                csv_rows = [csv_header]
+                var_names = self.lmfit_result.var_names
+                val_dict = self.lmfit_result.params.valuesdict()
+                sig = np.sqrt(np.diag(self.lmfit_result.covar))
+                init_vals =  self.lmfit_result.init_vals
+                cnt = 0
+                for key in val_dict.keys():
+                    if(key=='qi'):
+                        dqi_dqc_2 = (val_dict['qr']/(val_dict['qc']-val_dict['qr']))**4
+                        dqi_dqr_2 = (val_dict['qc']/(val_dict['qc']-val_dict['qr']))**4
+                        sig_qc = sig[var_names.index('qc')]
+                        sig_qr = sig[var_names.index('qr')]
+                        sig_qi = np.sqrt(dqi_dqc_2*sig_qc**2 + dqi_dqr_2*sig_qr**2)
+                        tmp_row = [key, str(val_dict[key]), str(sig_qi), 'None']
+                    else:
+                        tmp_row = [key, str(val_dict[key]), str(sig[cnt]), str(init_vals[cnt])]
+                        cnt += 1
+                    csv_rows.append(tmp_row)
+                writer = csv.writer(f)
+                for row in csv_rows:
+                    writer.writerow(row)
+
+            with open(self.save_dir+save_fname2, 'w', newline="") as f  :
+                csv_header = ['para_name', 'value']
+                csv_rows = [csv_header]
+                val_dict = self.lmfit_circle_params.valuesdict()
+                for key in val_dict.keys():
+                    tmp_row = [key, str(val_dict[key])]
+                    csv_rows.append(tmp_row)
+                writer = csv.writer(f)
+                for row in csv_rows:
+                    writer.writerow(row)
+        except:
+            print("Error! Cannot get fine fit params")
+
+
+    def save_coarse_fit_params(self, save_fname1='coarse_fit_params.csv', save_fname2='coarse_fit_circle_params.csv'):
+        with open(self.save_dir+save_fname1, 'w', newline="") as f  :
+            csv_header = ['para_name', 'value']
+            csv_rows = [csv_header]
+            val_dict = self.lmfit_init_params.valuesdict()
+            for key in val_dict.keys():
+                tmp_row = [key, str(val_dict[key])]
+                csv_rows.append(tmp_row)
+            writer = csv.writer(f)
+            for row in csv_rows:
+                writer.writerow(row)
+        with open(self.save_dir+save_fname2, 'w', newline="") as f  :
+            csv_header = ['para_name', 'value']
+            csv_rows = [csv_header]
+            val_dict = self.lmfit_init_circle_params.valuesdict()
+            for key in val_dict.keys():
+                tmp_row = [key, str(val_dict[key])]
+                csv_rows.append(tmp_row)
+            writer = csv.writer(f)
+            for row in csv_rows:
+                writer.writerow(row)
 
     def phase_smoother(self, theta, **kwargs):
         options = {'std_theta':theta[0]}
@@ -351,9 +414,9 @@ class Gao():
         )
 
         print("\ncoarse fit results")
-        self.lmfit_init_params.pretty_print(columns=['value'])
+        self.lmfit_init_params.pretty_print(columns=['value'], fmt='e')
         print("\ncoarse fit circle property")
-        self.lmfit_init_circle_params.pretty_print(columns=['value'])
+        self.lmfit_init_circle_params.pretty_print(columns=['value'], fmt='e')
         self.theta_fit_range = np.array([np.min(fit_f), np.max(fit_f)])
         return fit_params
 
@@ -401,7 +464,7 @@ class Gao():
         ('r', fine_r, False, None, None, None, None)
         ) 
         print("\nfine fit circle property")
-        self.lmfit_circle_params.pretty_print(columns=['value'])
+        self.lmfit_circle_params.pretty_print(columns=['value'], fmt='e')
         self.fine_fit_range = np.array([np.min(fit_f), np.max(fit_f)])
         fit_params = np.array([fine_tau, fine_xc, fine_yc, fine_r, fine_fr, fine_Qr, fine_phi_0])
         return fit_params
@@ -674,3 +737,12 @@ class Gaonep(Gao):
     def save_nep(self, phase_nep_fname='phase_nep.dat'):
         freq_nep = np.hstack((self.comb_freq_phase[:, 0].reshape(-1,1), self.nep.reshape(-1,1)))
         np.savetxt(self.save_dir+phase_nep_fname, freq_nep, delimiter=' ', header='freq(Hz) NEP[W/Hz^1/2]')
+
+
+class Gaotau(Gao):
+    def __init__(self, ref_swp_fname, sg_freq=4000):
+        self.trg_fname = "tod_trg.dat"
+        self.lmfit_init_params = Parameters()
+        self.lmfit_tau_result = minimizer.MinimizerResult()
+
+        super().__init__(ref_swp_fname, sg_freq)
