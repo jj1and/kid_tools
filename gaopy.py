@@ -135,6 +135,51 @@ class Gao():
             for row in csv_rows:
                 writer.writerow(row)
 
+    def output_fine_params(self):
+        params_header = ['para_name', 'value', 'sigma', 'init_val']
+        params_rows = [params_header]
+        var_names = self.lmfit_result.var_names
+        val_dict = self.lmfit_result.params.valuesdict()
+        sig = np.sqrt(np.diag(self.lmfit_result.covar))
+        init_vals =  self.lmfit_result.init_vals
+        cnt = 0
+        for key in val_dict.keys():
+            if(key=='qi'):
+                dqi_dqc_2 = (val_dict['qr']/(val_dict['qc']-val_dict['qr']))**4
+                dqi_dqr_2 = (val_dict['qc']/(val_dict['qc']-val_dict['qr']))**4
+                sig_qc = sig[var_names.index('qc')]
+                sig_qr = sig[var_names.index('qr')]
+                sig_qi = np.sqrt(dqi_dqc_2*sig_qc**2 + dqi_dqr_2*sig_qr**2)
+                tmp_row = [key, str(val_dict[key]), str(sig_qi), 'None']
+            else:
+                tmp_row = [key, str(val_dict[key]), str(sig[cnt]), str(init_vals[cnt])]
+                cnt += 1
+            params_rows.append(tmp_row)
+        
+        circ_params_header = ['para_name', 'value']
+        circ_params_rows = [circ_params_header]
+        val_dict = self.lmfit_circle_params.valuesdict()
+        for key in val_dict.keys():
+            tmp_row = [key, str(val_dict[key])]
+            circ_params_rows.append(tmp_row)
+        return params_rows, circ_params_rows
+
+    def output_coarse_params(self):
+        params_header = ['para_name', 'value']
+        params_rows = [params_header]
+        val_dict = self.lmfit_init_params.valuesdict()
+        for key in val_dict.keys():
+            tmp_row = [key, str(val_dict[key])]
+            params_rows.append(tmp_row)
+        circ_params_header = ['para_name', 'value']
+        circ_params_rows = [circ_params_header]
+        val_dict = self.lmfit_init_circle_params.valuesdict()
+        for key in val_dict.keys():
+            tmp_row = [key, str(val_dict[key])]
+            circ_params_rows.append(tmp_row)
+        return params_rows, circ_params_rows
+
+
     def phase_smoother(self, theta, **kwargs):
         options = {'std_theta':theta[0]}
         options.update(kwargs)
