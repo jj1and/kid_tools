@@ -37,7 +37,7 @@ class Kidraw():
             fine_fit_params = self.gao_obj.fine_fit(**kwargs)
             fit_params = fine_fit_params
             self.fine_fitting_flag = False
-        except:
+        except AttributeError:
             print("fine fitting : Failed")
             fit_params = coarse_fit_params
         self.tau = fit_params[0]
@@ -52,7 +52,6 @@ class Kidraw():
         options = {'save':False}
         options.update(kwargs)
 
-        fig_size = (10, 10)
         dpi_val = 200
         x, y = self.gao_obj.remove_tau_effect(self.gao_obj.I, self.gao_obj.Q, self.gao_obj.f, self.tau)
         xc_c, yc_c = self.gao_obj.set_data_default_position(self.gao_obj.I, self.gao_obj.Q, self.gao_obj.f)
@@ -67,13 +66,14 @@ class Kidraw():
         phase = np.arctan2(self.gao_obj.Q, self.gao_obj.I)
         smooth_phase = self.gao_obj.phase_smoother(phase)
 
-        fig_IQ = self.plt_obj.figure('IQ', figsize=fig_size,dpi=dpi_val)
+        fig_IQ = self.plt_obj.figure('IQ', dpi=dpi_val, figsize=(6,6))
         ax_IQ = fig_IQ.add_subplot(111)
         ax_IQ.tick_params(direction='in')
         ax_IQ.grid(True)
         ax_IQ.set_title("sweep result")
         ax_IQ.set_xlabel("I")
         ax_IQ.set_ylabel("Q")
+        ax_IQ.set_aspect('equal', 'datalim')
         ax_IQ.scatter(self.gao_obj.I, self.gao_obj.Q, label="I/Q", color='r')
         ax_IQ.scatter(x, y, label="I/Q (removed tau)", color='b')
         ax_IQ.scatter(xc_c, yc_c, label="I/Q (centerd)", color='g')
@@ -92,9 +92,9 @@ class Kidraw():
         else:
             pass
 
-        self.plt_obj.legend()
+        self.plt_obj.legend(loc='upper right')
 
-        fig_theta_func = self.plt_obj.figure('theta_fit', figsize=fig_size,dpi=dpi_val)
+        fig_theta_func = self.plt_obj.figure('theta_fit', dpi=dpi_val, figsize=(6.4, 4.8))
         start_theta=-self.gao_obj.lmfit_theta_result.params['theta_0']
         theta_func_fit_index = np.where((self.gao_obj.f>self.gao_obj.theta_fit_range[0])&(self.gao_obj.f<self.gao_obj.theta_fit_range[1]))
         theta_func_plot_f = np.linspace(self.gao_obj.theta_fit_range[0], self.gao_obj.theta_fit_range[1], 100)
@@ -107,9 +107,9 @@ class Kidraw():
         ax_theta_func.set_ylabel("theta[rad]")
         ax_theta_func.scatter(self.gao_obj.f[theta_func_fit_index]/1e6, crs_theta_c[theta_func_fit_index]-start_theta, label='data')
         ax_theta_func.plot(theta_func_plot_f/1e6, theta_func_plot_p-start_theta, label='fitting', color='crimson')
-        self.plt_obj.legend()
+        self.plt_obj.legend(loc='upper right')
 
-        fig_all = self.plt_obj.figure('swp_all',figsize=fig_size,dpi=dpi_val)
+        fig_all = self.plt_obj.figure('swp_all', dpi=dpi_val, figsize=(6,8))
         ax_fI = fig_all.add_subplot(411)
         ax_fI.grid(True)
         ax_fI.set_xlabel("Frequancy[MHz]")
@@ -158,7 +158,9 @@ class Kidraw():
             tod_x, tod_y = self.gao_obj.remove_tau_effect(tod_I, tod_Q, tod_freq, self.tau)
             tod_xc_c, tod_yc_c = self.gao_obj.set_data_default_position(tod_I, tod_Q, tod_freq)
 
-            fig = self.plt_obj.figure(tod_file[0].split('/')[-1])
+            fig_size=(6,6)
+            dpi_val = 200
+            fig = self.plt_obj.figure(tod_file[0].split('/')[-1], figsize=fig_size, dpi=dpi_val)
             ax = fig.add_subplot(111)
             ax.tick_params(direction='in')
             ax.grid(True)
@@ -174,18 +176,18 @@ class Kidraw():
             ax.scatter(tod_xc_c, tod_yc_c, color='w', edgecolors='k', marker='o')
             self.plt_obj.legend()
 
-            if(options['save']==True):
-                save_fig = self.plt_obj.figure('tod_1ksps.dat')
-                save_fig.suptitle('tod plot (1ksps)')
-                save_fig.savefig(self.save_dir+'tod_1ksps.png')
+        if(options['save']==True):
+            save_fig = self.plt_obj.figure('tod_1ksps.dat')
+            save_fig.suptitle('tod plot (1ksps)')
+            save_fig.savefig(self.save_dir+'tod_1ksps.png')
 
-                save_fig = self.plt_obj.figure('tod_100ksps.dat')
-                save_fig.suptitle('tod plot (100ksps)')
-                save_fig.savefig(self.save_dir+'tod_100ksps.png')
+            save_fig = self.plt_obj.figure('tod_100ksps.dat')
+            save_fig.suptitle('tod plot (100ksps)')
+            save_fig.savefig(self.save_dir+'tod_100ksps.png')
 
-                save_fig = self.plt_obj.figure('tod_1Msps.dat')
-                save_fig.suptitle('tod plot (1Msps)')
-                save_fig.savefig(self.save_dir+'tod_1Msps.png')
+            save_fig = self.plt_obj.figure('tod_1Msps.dat')
+            save_fig.suptitle('tod plot (1Msps)')
+            save_fig.savefig(self.save_dir+'tod_1Msps.png')
 
     def draw_psd(self,  tod_freq, tod_file_list, **kwargs):
         options = {'save':False}
@@ -195,7 +197,7 @@ class Kidraw():
         comb_freq_amp_welch, comb_freq_phase_welch = self.gao_obj.comb_psd(tod_freq, tod_file_list, psd_unit='dB', **kwargs)
         comb_freq_amp_peri, comb_freq_phase_peri = self.gao_obj.comb_psd(tod_freq, tod_file_list, psd_method = "periodogram", psd_unit='dB', save_to_menber=False, **kwargs)
         
-        fig_amp = self.plt_obj.figure('amp_psd')
+        fig_amp = self.plt_obj.figure('amp_psd', figsize=(6.4, 4.8), dpi=200)
         ax_amp = fig_amp.add_subplot(111)
         ax_amp.tick_params(direction='in')
         ax_amp.grid(True)
@@ -207,7 +209,7 @@ class Kidraw():
         ax_amp.plot(comb_freq_amp_welch[:,0], comb_freq_amp_welch[:,1], label='welch', color='r')
         self.plt_obj.legend()
 
-        fig_phase = self.plt_obj.figure('phase_psd')
+        fig_phase = self.plt_obj.figure('phase_psd', figsize=(6.4, 4.8), dpi=200)
         ax_phase = fig_phase.add_subplot(111)
         ax_phase.tick_params(direction='in')
         ax_phase.grid(True)
@@ -219,7 +221,7 @@ class Kidraw():
         ax_phase.plot(comb_freq_phase_welch[:,0], comb_freq_phase_welch[:,1], label='welch', color='b')
         self.plt_obj.legend()
 
-        fig_avp = self.plt_obj.figure('amp_vs_phase')
+        fig_avp = self.plt_obj.figure('amp_vs_phase', figsize=(6.4, 4.8), dpi=200)
         ax_avp = fig_avp.add_subplot(111)
         ax_avp.tick_params(direction='in')
         ax_avp.grid(True)
@@ -235,6 +237,9 @@ class Kidraw():
             save_fig = self.plt_obj.figure(fig_lb)
             save_fig.savefig(self.save_dir+fig_lb+'.pdf')
 
+    def close_plt_obj(self):
+        self.plt_obj.close()
+
 
 
 
@@ -249,7 +254,7 @@ class Nepdraw(Kidraw):
         options.update(kwargs)
 
         self.oncho_file_list=oncho_file_list
-        fig = self.plt_obj.figure('oncho')
+        fig = self.plt_obj.figure('oncho', figsize=(6, 6), dpi=200)
         ax = fig.add_subplot(111)
         ax.grid(True)
         ax.set_title("oncho result")
@@ -311,7 +316,7 @@ class Nepdraw(Kidraw):
         self.gao_obj.oncho_analisys(oncho_file_list, self.fr, self.Qr)
         self.gao_obj.Temp2Nqp(N0, delta_0, volume)
 
-        fig_TvsPS = self.plt_obj.figure('T_vs_PS')
+        fig_TvsPS = self.plt_obj.figure('T_vs_PS', figsize=(6.4, 4.8), dpi=200)
         ax_TvsPS = fig_TvsPS.add_subplot(111)
         ax_TvsPS.tick_params(direction='in')
         ax_TvsPS.set_title("Temperature vs Phase Shift")
@@ -322,7 +327,7 @@ class Nepdraw(Kidraw):
         upp_xerr = self.gao_obj.Tstart_stop[:, 1]-self.gao_obj.Tarray
         ax_TvsPS.errorbar(self.gao_obj.Tarray, self.gao_obj.phase_shift, xerr=[low_xerr, upp_xerr], fmt='o')
 
-        fig_NqpvsPS = self.plt_obj.figure('Nqp_vs_PS')
+        fig_NqpvsPS = self.plt_obj.figure('Nqp_vs_PS', figsize=(6.4, 4.8), dpi=200)
         ax_NqpvsPS = fig_NqpvsPS.add_subplot(111)
         ax_NqpvsPS.tick_params(direction='in')
         ax_NqpvsPS.set_title("Nqp vs Phase Shift")
@@ -353,7 +358,7 @@ class Nepdraw(Kidraw):
         
         freq, nep = self.gao_obj.calc_nep(delta, eta, tau_qp, fit_Nqp_min, fit_Nqp_max, init_dth_dNqp, init_phase_bias)
         
-        fig_NqpvsPSFit = self.plt_obj.figure('Nqp_vs_PS+Fit')
+        fig_NqpvsPSFit = self.plt_obj.figure('Nqp_vs_PS+Fit', figsize=(6.4, 4.8), dpi=200)
         ax_NqpvsPSFit = fig_NqpvsPSFit.add_subplot(111)
         ax_NqpvsPSFit.tick_params(direction='in')
         ax_NqpvsPSFit.set_title("Nqp vs Phase Shift")
@@ -364,7 +369,7 @@ class Nepdraw(Kidraw):
         ax_NqpvsPSFit.plot(fit_Nqp, fn.phase_Nqp_func(fit_Nqp, self.gao_obj.lmfit_oncho_result.params), label='fitting', color='r')
         self.plt_obj.legend()
 
-        fig_nep = self.plt_obj.figure('NEP')
+        fig_nep = self.plt_obj.figure('NEP', figsize=(6.4, 4.8), dpi=200)
         ax_nep = fig_nep.add_subplot(111)
         ax_nep.tick_params(direction='in')
         ax_nep.set_title("NEP")

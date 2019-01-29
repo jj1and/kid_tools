@@ -59,7 +59,7 @@ class Gao():
                 yc = circle_params_dict['yc']
                 r = circle_params_dict['r']
 
-        except:
+        except AttributeError:
             print("Error! Cannot get fine fit params")
             params_dict = self.lmfit_init_params.valuesdict()
             circle_params_dict = self.lmfit_init_circle_params.valuesdict()
@@ -109,7 +109,7 @@ class Gao():
                 writer = csv.writer(f)
                 for row in csv_rows:
                     writer.writerow(row)
-        except:
+        except AttributeError:
             print("Error! Cannot get fine fit params")
 
 
@@ -138,31 +138,36 @@ class Gao():
     def output_fine_params(self):
         params_header = ['para_name', 'value', 'sigma', 'init_val']
         params_rows = [params_header]
-        var_names = self.lmfit_result.var_names
-        val_dict = self.lmfit_result.params.valuesdict()
-        sig = np.sqrt(np.diag(self.lmfit_result.covar))
-        init_vals =  self.lmfit_result.init_vals
-        cnt = 0
-        for key in val_dict.keys():
-            if(key=='qi'):
-                dqi_dqc_2 = (val_dict['qr']/(val_dict['qc']-val_dict['qr']))**4
-                dqi_dqr_2 = (val_dict['qc']/(val_dict['qc']-val_dict['qr']))**4
-                sig_qc = sig[var_names.index('qc')]
-                sig_qr = sig[var_names.index('qr')]
-                sig_qi = np.sqrt(dqi_dqc_2*sig_qc**2 + dqi_dqr_2*sig_qr**2)
-                tmp_row = [key, str(val_dict[key]), str(sig_qi), 'None']
-            else:
-                tmp_row = [key, str(val_dict[key]), str(sig[cnt]), str(init_vals[cnt])]
-                cnt += 1
-            params_rows.append(tmp_row)
-        
         circ_params_header = ['para_name', 'value']
         circ_params_rows = [circ_params_header]
-        val_dict = self.lmfit_circle_params.valuesdict()
-        for key in val_dict.keys():
-            tmp_row = [key, str(val_dict[key])]
-            circ_params_rows.append(tmp_row)
+        try:
+            var_names = self.lmfit_result.var_names
+            val_dict = self.lmfit_result.params.valuesdict()
+            sig = np.sqrt(np.diag(self.lmfit_result.covar))
+            init_vals =  self.lmfit_result.init_vals
+            cnt = 0
+            for key in val_dict.keys():
+                if(key=='qi'):
+                    dqi_dqc_2 = (val_dict['qr']/(val_dict['qc']-val_dict['qr']))**4
+                    dqi_dqr_2 = (val_dict['qc']/(val_dict['qc']-val_dict['qr']))**4
+                    sig_qc = sig[var_names.index('qc')]
+                    sig_qr = sig[var_names.index('qr')]
+                    sig_qi = np.sqrt(dqi_dqc_2*sig_qc**2 + dqi_dqr_2*sig_qr**2)
+                    tmp_row = [key, str(val_dict[key]), str(sig_qi), 'None']
+                else:
+                    tmp_row = [key, str(val_dict[key]), str(sig[cnt]), str(init_vals[cnt])]
+                    cnt += 1
+                params_rows.append(tmp_row)
+            
+            val_dict = self.lmfit_circle_params.valuesdict()
+            for key in val_dict.keys():
+                tmp_row = [key, str(val_dict[key])]
+                circ_params_rows.append(tmp_row)
+
+        except AttributeError:
+            print("cannot get fine params")
         return params_rows, circ_params_rows
+    
 
     def output_coarse_params(self):
         params_header = ['para_name', 'value']
@@ -671,7 +676,7 @@ class Gao():
 
 class Gaonep(Gao):
     def __init__(self, ref_swp_fname, sg_freq=4000):
-        self.oncho_file_list = []
+        self.oncho_fit_range = np.array([])
         self.Tarray = np.ndarray([])
         self.Tstart_stop = np.ndarray([])
         self.Nqp = np.ndarray([])
@@ -723,7 +728,7 @@ class Gaonep(Gao):
         phase_shift = phase_shift[sort] -phase_shift[sort[0]]
 
         grad = np.diff(phase_shift)
-        ther = 0.5
+        ther = 0.8
         for i in range(1, phase_shift.shape[0]-1):
             if(np.abs(grad[i])/(2*np.pi)>ther):
                 if(grad[i]<0):
@@ -757,6 +762,7 @@ class Gaonep(Gao):
 
 
     def calc_nep(self, delta, eta, tau_qp, fit_Nqp_min, fit_Nqp_max, init_dth_dNqp=1.0, init_phase_bias=0.0):
+        self.oncho_fit_range = np.array([fit_Nqp_min, fit_Nqp_max])
         self.lmfit_oncho_init_params.add_many(
         ('dth_dNqp', init_dth_dNqp, True, None, None, None, None), 
         ('phase_bias', init_phase_bias, True, None, None, None, None))
@@ -768,11 +774,16 @@ class Gaonep(Gao):
         self.lmfit_oncho_result = minimizer.minimize(fn.phase_Nqp_func_resiual, self.lmfit_oncho_init_params, args=(fit_Nqp, fit_phase_shift))
         report_fit(self.lmfit_oncho_result)
 
+        self.lmfit_element_props.add_many(
+        ('eta', eta, False, None, None, None, None), 
+        ('delta', delta, False, None, None, None, None), 
+        ('tau_qp', tau_qp, False, None, None, None, None))
+
         self.lmfit_nep_props.add_many(
         ('eta', eta, False, None, None, None, None),
         ('delta', delta, False, None, None, None, None),
         ('tau_qp', tau_qp, False, None, None, None, None),
-        ('dth_dNqp', self.lmfit_oncho_result.params.valuesdict()['dth_dNqp'], False, None, None, None, None))
+        ('dth_dNqp', self.lmfit_oncho_result.params['dth_dNqp'], False, None, None, None, None))
 
         nep = fn.nep_func(self.comb_freq_phase[:, 1], self.comb_freq_phase[:, 0], self.lmfit_nep_props)
         self.nep = nep
@@ -782,6 +793,54 @@ class Gaonep(Gao):
     def save_nep(self, phase_nep_fname='phase_nep.dat'):
         freq_nep = np.hstack((self.comb_freq_phase[:, 0].reshape(-1,1), self.nep.reshape(-1,1)))
         np.savetxt(self.save_dir+phase_nep_fname, freq_nep, delimiter=' ', header='freq(Hz) NEP[W/Hz^1/2]')
+
+    def save_Nqp_PS(self, Nqp_PS_fname='oncho_result.dat'):
+        T_Terr = np.hstack((self.Tarray.reshape(-1,1), self.Tstart_stop))
+        Nqp_PS = np.hstack((self.Nqp.reshape(-1,1), self.phase_shift.reshape(-1,1)))
+        T_Terr_Nqp_PS = np.hstack((T_Terr, Nqp_PS))
+        np.savetxt(self.save_dir+Nqp_PS_fname, T_Terr_Nqp_PS, delimiter=' ', header='T[mK] T_start[mK] T_stop[mK] Nqp phase_shift[rad]')
+
+    def save_soshi_params(self, save_fname='soshi_props.csv'):
+        with open(self.save_dir+save_fname, 'w', newline="") as f  :
+            csv_header = ['para_name', 'value', 'sigma']
+            csv_rows = [csv_header]
+            para_dict = self.lmfit_element_props.valuesdict()
+            val_dict = self.lmfit_oncho_result.params.valuesdict()
+            sig = np.sqrt(np.diag(self.lmfit_oncho_result.covar))
+            for key in para_dict.keys():
+                tmp_row = [key, str(para_dict[key]), 'None']
+                csv_rows.append(tmp_row)
+            for cnt, key in enumerate(val_dict.keys()):
+                tmp_row = [key, str(val_dict[key]), str(sig[cnt])]
+                csv_rows.append(tmp_row)
+            oncho_fit_range_min_row = ['fit_range_min', str(self.oncho_fit_range[0]), 'None']
+            oncho_fit_range_max_row = ['fit_range_max', str(self.oncho_fit_range[1]), 'None']
+
+            csv_rows.append(oncho_fit_range_min_row)
+            csv_rows.append(oncho_fit_range_max_row)
+            writer = csv.writer(f)
+            for row in csv_rows:
+                writer.writerow(row)
+
+    def output_soshi_params(self, save_fname='soshi_props.csv'):
+        with open(self.save_dir+save_fname, 'w', newline="") as f  :
+            csv_header = ['para_name', 'value', 'sigma']
+            csv_rows = [csv_header]
+            para_dict = self.lmfit_element_props.valuesdict()
+            val_dict = self.lmfit_oncho_result.params.valuesdict()
+            sig = np.sqrt(np.diag(self.lmfit_oncho_result.covar))
+            for key in para_dict.keys():
+                tmp_row = [key, str(para_dict[key]), 'None']
+                csv_rows.append(tmp_row)
+            for cnt, key in enumerate(val_dict.keys()):
+                tmp_row = [key, str(val_dict[key]), str(sig[cnt])]
+                csv_rows.append(tmp_row)
+            oncho_fit_range_min_row = ['fit_range_min', str(self.oncho_fit_range[0]), 'None']
+            oncho_fit_range_max_row = ['fit_range_max', str(self.oncho_fit_range[0]), 'None']
+
+            csv_rows.append(oncho_fit_range_min_row)
+            csv_rows.append(oncho_fit_range_max_row)
+            return csv_rows
 
 
 class Gaotau(Gao):
