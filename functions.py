@@ -47,6 +47,17 @@ def nep_func(phase_psd, f, params):
     nep_sq = phase_psd*((eta*tau_qp*dth_dNqp/(delta*1.602*1E-19))**(-2))*(1 + (tau_qp*2*np.pi*f)**2)*(1 + (tau_res*2*np.pi*f)**2)
     return np.sqrt(nep_sq)
 
+def phase_tau_func(time, params):
+    A, tau, bias = [params['phase_Amp'], params['phase_tau'], params['phase_bias']]
+    y = -A*np.exp(-time/tau) + bias
+    return y
+
+def phase_tau_func_residual(params, time, y):
+    val = phase_tau_func(time, params)
+    residual = y-val
+    return residual
+
+
 
 
 #def r_cov_func(xc, yc, qr, qc, xc_cov, yc_cov, qr_cov, qc_cov):

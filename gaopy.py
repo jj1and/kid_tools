@@ -627,51 +627,6 @@ class Gao():
         np.savetxt(self.save_dir+amp_psd_fname, self.comb_freq_amp, delimiter=' ', header='freq[Hz] amp_PSD[dBc/Hz]')
         np.savetxt(self.save_dir+phase_psd_fname, self.comb_freq_phase, delimiter=' ', header='freq[Hz] phase_PSD[dBc/Hz]')
 
-    def tod2trg(self, trg_file_name, sample_rate, tod_freq, *fit_params, **kwargs):
-        options={"load_fit_file":"none",
-                 "loops":False}
-        options.update(kwargs)
-
-        tau, xc, yc, r, fr, Qr, phi_0 = self.get_fit_params(*fit_params, **kwargs)
-
-        trg_tod_data = np.genfromtxt(trg_file_name, delimiter=" ")
-        time = trg_tod_data[:, 0]/(sample_rate*1000)
-
-        if(options["loops"]==False):
-            # why??
-            trg_tod_I = trg_tod_data[:, 1]*sample_rate
-            trg_tod_Q = trg_tod_data[:, 2]*sample_rate
-
-            xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, tod_freq)
-            theta = np.arctan2(yc_c, xc_c)
-            phase = self.phase_smoother(theta, **kwargs)
-            return time, phase
-
-        elif(options["loops"]==True):
-            trg_header_index = np.where(time==0.0)
-            cnt = 0
-            for i in trg_header_index[0]:
-                start = trg_header_index[0][cnt]
-                if(cnt>=np.shape(trg_header_index[0])[0]-1):
-                    stop = time.shape[0]+1
-                else:
-                    stop = trg_header_index[0][cnt+1]
-                trg_tod_I = trg_tod_data[start:stop, 1]*sample_rate
-                trg_tod_Q = trg_tod_data[start:stop, 2]*sample_rate
-                xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, tod_freq)
-                theta = np.arctan2(yc_c, xc_c)
-                one_trg_time = time[start:stop]
-                one_trg_phase = self.phase_smoother(theta)
-                if(cnt==0):
-                    one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
-                    loop_trg_set = np.array([one_trg])
-                else:
-                    one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
-                    loop_trg_set = np.append(loop_trg_set, [one_trg], axis=0)
-                cnt += 1
-            return loop_trg_set
-
-
 
 
 class Gaonep(Gao):
@@ -850,3 +805,71 @@ class Gaotau(Gao):
         self.lmfit_tau_result = minimizer.MinimizerResult()
 
         super().__init__(ref_swp_fname, sg_freq)
+
+    def tod2trg(self, trg_file_name, sample_rate, trg_freq, *fit_params, **kwargs):
+        options={"load_fit_file":"none",
+                 "loops":False}
+        options.update(kwargs)
+
+        tau, xc, yc, r, fr, Qr, phi_0 = self.get_fit_params(*fit_params, **kwargs)
+
+        trg_tod_data = np.genfromtxt(trg_file_name, delimiter=" ")
+        time = trg_tod_data[:, 0]/(sample_rate*1000)
+
+        trg_header_index = np.where(time==0.0)
+        cnt = 0
+        for i in trg_header_index[0]:
+            start = i
+            if(cnt>=np.shape(trg_header_index[0])[0]-1):
+                #end of loop trg_file
+                stop = time.shape[0]+1
+            else:
+                stop = trg_header_index[0][cnt+1]
+            trg_tod_I = trg_tod_data[start:stop, 1]*sample_rate
+            trg_tod_Q = trg_tod_data[start:stop, 2]*sample_rate
+            xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
+            theta = np.arctan2(yc_c, xc_c)
+            one_trg_time = time[start:stop]
+            one_trg_phase = self.phase_smoother(theta)
+            if(cnt==0):
+                one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
+                trg_set = np.array([one_trg])
+            else:
+                one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
+                trg_set = np.append(trg_set, [one_trg], axis=0)
+            cnt += 1
+        return trg_set
+
+        # if(options["loops"]==False):
+        #     # why??
+        #     trg_tod_I = trg_tod_data[:, 1]*sample_rate
+        #     trg_tod_Q = trg_tod_data[:, 2]*sample_rate
+
+        #     xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, tod_freq)
+        #     theta = np.arctan2(yc_c, xc_c)
+        #     phase = self.phase_smoother(theta, **kwargs)
+        #     return time, phase
+
+        # elif(options["loops"]==True):
+        #     trg_header_index = np.where(time==0.0)
+        #     cnt = 0
+        #     for i in trg_header_index[0]:
+        #         start = trg_header_index[0][cnt]
+        #         if(cnt>=np.shape(trg_header_index[0])[0]-1):
+        #             stop = time.shape[0]+1
+        #         else:
+        #             stop = trg_header_index[0][cnt+1]
+        #         trg_tod_I = trg_tod_data[start:stop, 1]*sample_rate
+        #         trg_tod_Q = trg_tod_data[start:stop, 2]*sample_rate
+        #         xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, tod_freq)
+        #         theta = np.arctan2(yc_c, xc_c)
+        #         one_trg_time = time[start:stop]
+        #         one_trg_phase = self.phase_smoother(theta)
+        #         if(cnt==0):
+        #             one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
+        #             loop_trg_set = np.array([one_trg])
+        #         else:
+        #             one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
+        #             loop_trg_set = np.append(loop_trg_set, [one_trg], axis=0)
+        #         cnt += 1
+        #     return loop_trg_set

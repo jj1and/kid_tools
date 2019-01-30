@@ -4,6 +4,7 @@ import matplotlib.colors as colors
 import numpy as np
 from matplotlib.collections import LineCollection
 from . import gaopy
+from . import trgfit
 from . import functions as fn
 
 class Kidraw():
@@ -233,9 +234,10 @@ class Kidraw():
         ax_avp.plot(comb_freq_amp_welch[:,0], comb_freq_amp_welch[:,1], label='amplitude', color='r')
         self.plt_obj.legend()
 
-        for fig_lb in self.plt_obj.get_figlabels():
-            save_fig = self.plt_obj.figure(fig_lb)
-            save_fig.savefig(self.save_dir+fig_lb+'.pdf')
+        if(options['save']==True):
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf')
 
     def close_plt_obj(self):
         self.plt_obj.close()
@@ -305,8 +307,9 @@ class Nepdraw(Kidraw):
         axcb = fig.colorbar(line_segments)
         axcb.set_label("Temperature (mK)")
 
-        save_fig = self.plt_obj.figure('oncho')
-        save_fig.savefig(self.save_dir+'oncho.pdf')
+        if(options['save']==True):
+            save_fig = self.plt_obj.figure('oncho')
+            save_fig.savefig(self.save_dir+'oncho.pdf')
             
 
     def plot_phase_shift(self, oncho_file_list, N0, delta_0, volume, **kwargs):
@@ -335,9 +338,10 @@ class Nepdraw(Kidraw):
         ax_NqpvsPS.set_xlabel("Nqp")
         ax_NqpvsPS.scatter(self.gao_obj.Nqp, self.gao_obj.phase_shift)
 
-        for fig_lb in self.plt_obj.get_figlabels():
-            save_fig = self.plt_obj.figure(fig_lb)
-            save_fig.savefig(self.save_dir+fig_lb+'.pdf')
+        if(options['save']==True):
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf')
 
     def load_psd(self, amp_psd_fname, phase_psd_fname, skip_header=1):
         self.gao_obj.load_psd(amp_psd_fname, phase_psd_fname, skip_header=skip_header)
@@ -379,7 +383,113 @@ class Nepdraw(Kidraw):
         ax_nep.set_yscale('log', nonposy = 'clip')
         ax_nep.plot(freq, nep)
 
-        for fig_lb in self.plt_obj.get_figlabels():
-            save_fig = self.plt_obj.figure(fig_lb)
-            save_fig.savefig(self.save_dir+fig_lb+'.pdf')
+        if(options['save']==True):
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf')
+
+
+
+class Taudraw(Kidraw):
+    def __init__(self,  trg_swp_file_list = [['tod_trg.dat', 'sweep.dat', 4000]], **kwargs):
+        self.trg_swp_file_list = trg_swp_file_list
+        self.gao_obj_dict = {}
+        self.fine_fitting_flag_dict = {}
+        for trg_swp_file in trg_swp_file_list:
+            trg_fname = trg_swp_file[0]
+            trg_swp_fname = trg_swp_file[1]
+            sg_freq = trg_swp_file[2]
+            gao_obj = gaopy.Gaotau(trg_swp_fname, sg_freq)
+            self.gao_obj_dict[trg_fname] = gao_obj
+            self.fine_fitting_flag_dict[trg_fname] = True
+        
+        first_trg_fname = trg_swp_file_list[0][0]
+        first_ref_swp_fname = trg_swp_file_list[0][1]
+        first_ref_swp_sg_freq = trg_swp_file_list[0][2]
+        super().__init__(first_ref_swp_fname, first_ref_swp_sg_freq, **kwargs)
+        self.gao_obj = self.gao_obj_dict[first_trg_fname]
+        self.fine_fitting_flag = self.fine_fitting_flag_dict[first_trg_fname]
+        self.trg_file_dict = {}
+
+    def get_fit_params(self, **kwargs):
+        #change avoid fine fit setting later
+        options = {'avoid_fine_fit':['trg_fname', False],
+        'default_trg_file':self.trg_swp_file_list[0][0]}
+        options.update(kwargs)
+        for trg_file in self.gao_obj_dict.keys():
+            coarse_fit_params = self.gao_obj_dict[trg_file].coarse_fit(**kwargs)
+            try:
+                if((options['avoid_fine_fit'][0]==trg_file)&(options['avoid_fine_fit'][1]==True)):
+                    raise ValueError("avoid fine fitting")
+                else:
+                    pass
+                fine_fit_params = self.gao_obj_dict[trg_file].fine_fit(**kwargs)
+                fit_params = fine_fit_params
+                self.fine_fitting_flag_dict[trg_file] = False
+            except AttributeError:
+                print("fine fitting : Failed")
+                fit_params = coarse_fit_params
+            if(trg_file==options['default_trg_file']):
+                self.gao_obj = self.gao_obj_dict[trg_file]
+                self.fine_fitting_flag = self.fine_fitting_flag_dict[trg_file]
+                self.tau = fit_params[0]
+                self.xc = fit_params[1]
+                self.yc = fit_params[2]
+                self.r = fit_params[3]
+                self.fr = fit_params[4]
+                self.Qr = fit_params[5]
+                self.phi_0 = fit_params[6]
+
+
+
+
+    def load_trg(self, trg_file_list = [['tod_trg.dat', 1000]], trg_freq=4011e6):
+        for trg_file in trg_file_list:
+            print("loading" + trg_file[0] + "...")
+            sample_rate = trg_file[1]
+            trg_set = self.gao_obj.tod2trg(trg_file[0], sample_rate, trg_freq)
+            trgholder = trgfit.Trgholder(self.gao_obj.swp_file_name, trg_file[0], trg_file[1])
+            trgholder.analyze_trg(trg_set)
+            self.trg_file_dict[trg_file[0]] = trgholder
+
+    def plot_trg(self, plot_trg_fname='tod_trg.dat', **kwargs):
+        options = {'save':False,
+        'trg_index':0,
+        'noise_plot':False}
+        options.update(kwargs)
+        trg_fig = self.plt_obj.figure('one_trg')
+        trg_ax = trg_fig.add_subplot(111)
+        trg_ax.set_title('one trigger waveform')
+        trg_ax.set_xlabel('time [$\\mu s$]')
+        trg_ax.set_ylabel('phase [rad]')
+        trg_ax.grid(True, zorder=0)
+
+        plot_trgholder = self.trg_file_dict[plot_trg_fname]
+        if(options['noise_plot']==True):
+            time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
+        elif(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
+            time, phase = plot_trgholder.oneshot_list[options['trg_index']].output_data()
+            fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range
+            fit_time = np.linspace(fit_time_min, fit_time_max)
+            fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
+            params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
+            trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
+        else:
+            print("No trgger waveform was found.")
+            print("plot failed trigger waveform")
+            time, phase = plot_trgholder.failed_list[0].output_data()
+
+        trg_ax.plot(time*1e6, phase, zorder=5)
+        
+        self.plt_obj.legend()
+        if(options['save']==True):
+            save_fig = self.plt_obj.figure('one_trg')
+            save_fig.savefig(self.save_dir+'one_trigger_waveform.pdf')
+
+        return params_row
+
+
+
+
+    
 
