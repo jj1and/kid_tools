@@ -449,14 +449,14 @@ class Gao():
 
         # add with tuples: (NAME VALUE VARY MIN  MAX  EXPR  BRUTE_STEP)
         self.lmfit_init_params.add_many(
-        ('r_a', r_a, True, None, None, None, None), 
-        ('i_a', i_a, True, None, None, None, None), 
-        ('tau', tau, True, None, None, None, None), 
-        ('fr', fr, True, None, None, None, None), 
-        ('qr', Qr, True, None, None, None, None), 
-        ('qc', Qc, True, None, None, None, None), 
-        ('qi', Qi, False, None, None, None, None), 
-        ('phi_0', phi_0, True, None, None, None, None) )
+        ('r_a', float(r_a), True, None, None, None, None), 
+        ('i_a', float(i_a), True, None, None, None, None), 
+        ('tau', float(tau), True, None, None, None, None), 
+        ('fr', float(fr), True, None, None, None, None), 
+        ('qr', float(Qr), True, None, None, None, None), 
+        ('qc', float(Qc), True, None, None, None, None), 
+        ('qi', float(Qi), False, None, None, None, None), 
+        ('phi_0', float(phi_0), True, None, None, None, None) )
         self.lmfit_init_circle_params.add_many(
         ('xc', xc, False, None, None, None, None),
         ('yc', yc, False, None, None, None, None),
@@ -464,9 +464,9 @@ class Gao():
         )
 
         print("\ncoarse fit results")
-        self.lmfit_init_params.pretty_print(columns=['value'], fmt='e')
+        self.lmfit_init_params.pretty_print(colwidth=1, columns=['value'])
         print("\ncoarse fit circle property")
-        self.lmfit_init_circle_params.pretty_print(columns=['value'], fmt='e')
+        self.lmfit_init_circle_params.pretty_print(colwidth=1, columns=['value'])
         self.theta_fit_range = np.array([np.min(fit_f), np.max(fit_f)])
         return fit_params
 
@@ -514,7 +514,7 @@ class Gao():
         ('r', fine_r, False, None, None, None, None)
         ) 
         print("\nfine fit circle property")
-        self.lmfit_circle_params.pretty_print(columns=['value'], fmt='e')
+        self.lmfit_circle_params.pretty_print(colwidth=1, columns=['value'])
         self.fine_fit_range = np.array([np.min(fit_f), np.max(fit_f)])
         fit_params = np.array([fine_tau, fine_xc, fine_yc, fine_r, fine_fr, fine_Qr, fine_phi_0])
         return fit_params

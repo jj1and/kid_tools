@@ -48,8 +48,8 @@ def nep_func(phase_psd, f, params):
     return np.sqrt(nep_sq)
 
 def phase_tau_func(time, params):
-    A, tau, bias = [params['phase_Amp'], params['phase_tau'], params['phase_bias']]
-    y = -A*np.exp(-time/tau) + bias
+    A, tau, bias, start_t= [params['phase_Amp'], params['phase_tau'], params['phase_bias'], params['phase_start_t']]
+    y = -A*np.exp(-(time-start_t)/tau) + bias
     return y
 
 def phase_tau_func_residual(params, time, y):

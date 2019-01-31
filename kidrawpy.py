@@ -403,6 +403,7 @@ class Taudraw():
         self.trg_swp_file_list = trg_swp_file_list
         self.trg_spr_freq_dict = {}
         self.gao_obj_dict = {}
+        self.fit_info = pd.DataFrame([])
         self.swp_params_data = pd.DataFrame([])
         self.save_dir = './'
         self.plt_obj = plt
@@ -417,6 +418,7 @@ class Taudraw():
             self.gao_obj_dict[trg_fname] = gao_obj
             self.trg_spr_freq_dict[trg_fname] = [sample_rate, trg_freq]
         self.trg_file_dict = {}
+        self.combined_df = pd.DataFrame([])
 
     def set_save_dir(self, save_dir='./'):
         self.save_dir = save_dir
@@ -437,10 +439,10 @@ class Taudraw():
                         raise ValueError()
 
                 fine_fit_params = self.gao_obj_dict[trg_file].fine_fit(**kwargs)
-                if(self.gao_obj_dict[trg_file].lmfit_result.success==False):
+                if((self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3))==True):
                     print("fine fitting : Failed")
                     fit_params = coarse_fit_params
-                elif(self.gao_obj_dict[trg_file].lmfit_result.success==True):
+                elif(self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3)):
                     fit_params = fine_fit_params
                 fine_fit_success = self.gao_obj_dict[trg_file].lmfit_result.success
             except ValueError:
@@ -449,18 +451,26 @@ class Taudraw():
                 fine_fit_success = False
             fit_results = np.append(fit_params, fine_fit_success)
             swp_fit_params_list.append(fit_results)
-            swp_fit_params_index.append(trg_file)
+            swp_fit_params_index.append(trg_file.split('/')[-2]+'/'+trg_file.split('/')[-1])
         self.swp_params_data = pd.DataFrame(swp_fit_params_list[1:], index = swp_fit_params_index, columns=swp_fit_params_header)
         print(self.swp_params_data)
 
 
     def load_trg(self):
+        header = ['file_name', 'succeeded', 'failed', 'total']
+        fit_info_list = [header]
         for trg_file in self.trg_spr_freq_dict.keys():
             print("loading" + trg_file + "...")
             trg_set = self.gao_obj_dict[trg_file].tod2trg(trg_file, self.trg_spr_freq_dict[trg_file][0], self.trg_spr_freq_dict[trg_file][1])
             trgholder = trgfit.Trgholder(self.gao_obj_dict[trg_file].swp_file_name, trg_file, self.trg_spr_freq_dict[trg_file][0])
             trgholder.analyze_trg(trg_set)
             self.trg_file_dict[trg_file] = trgholder
+            tmp_row = [trg_file.split('/')[-2]+'/'+trg_file.split('/')[-1], len(trgholder.oneshot_list), len(trgholder.failed_list), len(trgholder.oneshot_list)+len(trgholder.failed_list)]
+            fit_info_list.append(tmp_row)
+        fit_info = pd.DataFrame(fit_info_list[1:], columns=header)
+        self.fit_info = fit_info.set_index('file_name')
+        self.combined_df = pd.concat([trgholder.analyzed_data for trgholder in self.trg_file_dict.values()], keys=[trg_fname.split('/')[-2]+'/'+trg_fname.split('/')[-1] for trg_fname in self.trg_file_dict.keys()])
+        pd.options.display.float_format = '{:.2e}'.format
 
     def plot_sweep(self, **kwargs):
         options = {'save':False,
@@ -471,7 +481,7 @@ class Taudraw():
         plot_I = self.gao_obj_dict[options['trg_fname']].I
         plot_Q = self.gao_obj_dict[options['trg_fname']].Q
         plot_f = self.gao_obj_dict[options['trg_fname']].f
-        plot_tau, plot_xc, plot_yc, plot_fine_fit_success = self.swp_params_data.loc[options['trg_fname'], ['tau', 'xc', 'yc', 'fine_fit_success']]
+        plot_tau, plot_xc, plot_yc, plot_fine_fit_success = self.swp_params_data.loc[options['trg_fname'].split('/')[-2]+'/'+options['trg_fname'].split('/')[-1], ['tau', 'xc', 'yc', 'fine_fit_success']]
 
         x, y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(plot_I, plot_Q, plot_f, plot_tau)
         xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(plot_I, plot_Q, plot_f)
@@ -610,8 +620,33 @@ class Taudraw():
             save_fig = self.plt_obj.figure('one_trg')
             save_fig.savefig(self.save_dir+'one_trigger_waveform.pdf', dpi=200)
 
-        return params_row
+        if(options['noise_plot']==False):
+            return params_row
 
+    def plot_histogram(self, **kwargs):
+        options = {'tau_bins':50,
+        'tau_min':0,
+        'tau_max':1000,
+        'amp_bins':200,
+        'amp_min':-0.5,
+        'amp_max':0.5}
+        options.update(kwargs)
+
+        fig_tau = self.plt_obj.figure('tau_hist')
+        ax_tau = fig_tau.add_subplot(111)
+        ax_tau.set_title('$\\tau$ histogram')
+        ax_tau.set_xlabel('$\\tau$ [$\\mu s$]')
+        ax_tau.set_ylabel('events')
+        ax_tau.grid(True, zorder=0)
+        tau_n, tau_bins, tau_patches = ax_tau.hist(self.combined_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5)
+
+        fig_amp = self.plt_obj.figure('amp_hist')
+        ax_amp = fig_amp.add_subplot(111)
+        ax_amp.set_title('Amp. histogram')
+        ax_amp.set_xlabel('Amp. [rad]')
+        ax_amp.set_ylabel('events')
+        ax_amp.grid(True, zorder=0)
+        amp_n, amp_bins, amp_patches = ax_amp.hist(self.combined_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5)
 
 
 
