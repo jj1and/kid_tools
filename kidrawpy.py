@@ -439,7 +439,7 @@ class Taudraw():
                         raise ValueError()
 
                 fine_fit_params = self.gao_obj_dict[trg_file].fine_fit(**kwargs)
-                if((self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3))==True):
+                if((self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3))==False):
                     print("fine fitting : Failed")
                     fit_params = coarse_fit_params
                 elif(self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3)):
