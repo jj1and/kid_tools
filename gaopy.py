@@ -496,8 +496,6 @@ class Gao():
         xdata = fit_f
 
         self.lmfit_result = minimizer.minimize(fn.t21_func_residual, self.lmfit_init_params, args=(xdata, ydata, eps_data))
-        print("\nfine fit report from lmfit")
-        report_fit(self.lmfit_result)
 
         #exp_IQ = fn.t21_func(fit_f, self.lmfit_result.params)
         params_dict = self.lmfit_result.params.valuesdict()
@@ -513,6 +511,9 @@ class Gao():
         ('yc', fine_yc, False, None, None, None, None),
         ('r', fine_r, False, None, None, None, None)
         ) 
+        print("\nfine fit report from lmfit")
+        report_fit(self.lmfit_result)
+
         print("\nfine fit circle property")
         self.lmfit_circle_params.pretty_print(colwidth=1, columns=['value'])
         self.fine_fit_range = np.array([np.min(fit_f), np.max(fit_f)])
@@ -823,6 +824,8 @@ class Gaotau(Gao):
             if(cnt>=np.shape(trg_header_index[0])[0]-1):
                 #end of loop trg_file
                 stop = time.shape[0]+1
+                if((stop+1-start)<=1024):
+                    break
             else:
                 stop = trg_header_index[0][cnt+1]
             trg_tod_I = trg_tod_data[start:stop, 1]*sample_rate

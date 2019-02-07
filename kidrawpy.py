@@ -4,6 +4,7 @@ import matplotlib.colors as colors
 import pandas as pd
 import numpy as np
 from matplotlib.collections import LineCollection
+from lmfit.models import LognormalModel
 from . import gaopy
 from . import trgfit
 from . import functions as fn
@@ -42,6 +43,10 @@ class Kidraw():
         except AttributeError:
             print("fine fitting : Failed")
             fit_params = coarse_fit_params
+        except ValueError:
+            print("fine fitting : Failed")
+            fit_params = coarse_fit_params
+
         self.tau = fit_params[0]
         self.xc = fit_params[1]
         self.yc = fit_params[2]
@@ -51,7 +56,8 @@ class Kidraw():
         self.phi_0 = fit_params[6]
 
     def plot_sweep(self, **kwargs):
-        options = {'save':False}
+        options = {'save':False,
+        'loc':'upper right'}
         options.update(kwargs)
 
         dpi_val = 200
@@ -94,7 +100,7 @@ class Kidraw():
         else:
             pass
 
-        self.plt_obj.legend(loc='upper right')
+        self.plt_obj.legend(loc=options['loc'])
         self.plt_obj.gca().set_aspect('equal', adjustable='box')
 
         fig_theta_func = self.plt_obj.figure('theta_fit')
@@ -110,7 +116,7 @@ class Kidraw():
         ax_theta_func.set_ylabel("theta[rad]")
         ax_theta_func.scatter(self.gao_obj.f[theta_func_fit_index]/1e6, crs_theta_c[theta_func_fit_index]-start_theta, label='data')
         ax_theta_func.plot(theta_func_plot_f/1e6, theta_func_plot_p-start_theta, label='fitting', color='crimson')
-        self.plt_obj.legend(loc='upper right')
+        self.plt_obj.legend(loc=options['loc'])
 
         fig_all = self.plt_obj.figure('swp_all')
         ax_fI = fig_all.add_subplot(411)
@@ -456,14 +462,14 @@ class Taudraw():
         print(self.swp_params_data)
 
 
-    def load_trg(self):
+    def load_trg(self, **kwargs):
         header = ['file_name', 'succeeded', 'failed', 'total']
         fit_info_list = [header]
         for trg_file in self.trg_spr_freq_dict.keys():
             print("loading" + trg_file + "...")
             trg_set = self.gao_obj_dict[trg_file].tod2trg(trg_file, self.trg_spr_freq_dict[trg_file][0], self.trg_spr_freq_dict[trg_file][1])
             trgholder = trgfit.Trgholder(self.gao_obj_dict[trg_file].swp_file_name, trg_file, self.trg_spr_freq_dict[trg_file][0])
-            trgholder.analyze_trg(trg_set)
+            trgholder.analyze_trg(trg_set, **kwargs)
             self.trg_file_dict[trg_file] = trgholder
             tmp_row = [trg_file.split('/')[-2]+'/'+trg_file.split('/')[-1], len(trgholder.oneshot_list), len(trgholder.failed_list), len(trgholder.oneshot_list)+len(trgholder.failed_list)]
             fit_info_list.append(tmp_row)
@@ -474,7 +480,8 @@ class Taudraw():
 
     def plot_sweep(self, **kwargs):
         options = {'save':False,
-        'trg_fname':self.trg_swp_file_list[0][0]}
+        'trg_fname':self.trg_swp_file_list[0][0],
+        'loc':'upper left'}
         options.update(kwargs)
 
         dpi_val = 200
@@ -522,7 +529,7 @@ class Taudraw():
         else:
             pass
 
-        self.plt_obj.legend(loc='upper right')
+        self.plt_obj.legend(loc=options['loc'])
         self.plt_obj.gca().set_aspect('equal', adjustable='box')
 
         fig_theta_func = self.plt_obj.figure('theta_fit')
@@ -538,7 +545,7 @@ class Taudraw():
         ax_theta_func.set_ylabel("theta[rad]")
         ax_theta_func.scatter(plot_f[theta_func_fit_index]/1e6, crs_theta_c[theta_func_fit_index]-start_theta, label='data')
         ax_theta_func.plot(theta_func_plot_f/1e6, theta_func_plot_p-start_theta, label='fitting', color='crimson')
-        self.plt_obj.legend(loc='upper right')
+        self.plt_obj.legend(loc=options['loc'])
 
         fig_all = self.plt_obj.figure('swp_all')
         ax_fI = fig_all.add_subplot(411)
@@ -585,7 +592,7 @@ class Taudraw():
         'trg_fname':self.trg_swp_file_list[0][0],
         'noise_plot':False}
         options.update(kwargs)
-        trg_fig = self.plt_obj.figure('one_trg')
+        trg_fig = self.plt_obj.figure('one_trg', clear=True)
         trg_ax = trg_fig.add_subplot(111)
         trg_ax.set_title('one trigger waveform')
         trg_ax.set_xlabel('time [$\\mu s$]')
@@ -600,18 +607,26 @@ class Taudraw():
                 print("No trgger waveform was found.")
                 print("plot first failed trigger waveform")
                 time, phase = plot_trgholder.failed_list[0].output_data()
+                trg_ax.plot(time, phase)
         elif(options['noise_plot']==False):
             if(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
                 time, phase = plot_trgholder.oneshot_list[options['trg_index']].output_data()
-                fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range
+                fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
                 fit_time = np.linspace(fit_time_min, fit_time_max)
                 fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
                 params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
                 trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
             else:
-                print("No trgger waveform was found.")
-                print("plot first failed trigger waveform")
-                time, phase = plot_trgholder.failed_list[0].output_data()
+                print("Selected trgger waveform was found.")
+                print("plot first trigger waveform")
+                time, phase = plot_trgholder.oneshot_list[0].output_data()
+                options['trg_index']=0
+                fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
+                fit_time = np.linspace(fit_time_min, fit_time_max)
+                fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
+                params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
+                trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
+
 
         trg_ax.plot(time*1e6, phase, zorder=5)
         
@@ -624,13 +639,26 @@ class Taudraw():
             return params_row
 
     def plot_histogram(self, **kwargs):
-        options = {'tau_bins':50,
-        'tau_min':0,
-        'tau_max':1000,
-        'amp_bins':200,
-        'amp_min':-0.5,
-        'amp_max':0.5}
+        options = {'save':False,
+        'tau_bins':100,
+        'tau_min':self.combined_df['phase_tau'].min()*1e6,
+        'tau_max':self.combined_df['phase_tau'].max()*1e6,
+        'amp_bins':100,
+        'amp_min':self.combined_df['phase_Amp'].min(),
+        'amp_max':self.combined_df['phase_Amp'].max(),
+        'area_bins':100,
+        'area_min':self.combined_df['phase_area'].min()*1e6,
+        'area_max':self.combined_df['phase_area'].max()*1e6,
+        'avt_tau_min_max':[self.combined_df['phase_tau'].min()*1e6, self.combined_df['phase_tau'].max()*1e6],
+        'avt_amp_min_max':[self.combined_df['phase_Amp'].min(), self.combined_df['phase_Amp'].max()],
+        'avt_bins':[100, 100],
+        'cut':[0]}
         options.update(kwargs)
+
+        if(len(options['cut'])==1):
+            cut_df = self.combined_df
+        elif(len(options['cut'])!=1):
+            cut_df = self.combined_df[options['cut']]
 
         fig_tau = self.plt_obj.figure('tau_hist')
         ax_tau = fig_tau.add_subplot(111)
@@ -638,7 +666,22 @@ class Taudraw():
         ax_tau.set_xlabel('$\\tau$ [$\\mu s$]')
         ax_tau.set_ylabel('events')
         ax_tau.grid(True, zorder=0)
-        tau_n, tau_bins, tau_patches = ax_tau.hist(self.combined_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5)
+        tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5)
+        tau_n_bins = np.hstack((tau_n.reshape(-1,1), tau_bins[:-1].reshape(-1,1)))
+        # tau_bin_width = tau_bins[-1]-tau_bins[-2]
+        # tau_x = tau_bins[:-1]+tau_bin_width/2
+        # lognom_mod = LognormalModel()
+        # lognom_pars = lognom_mod.guess(tau_n, x=tau_x)
+        # lognom_pars['amplitude'].set(np.max(tau_n))
+        # lognom_pars['center'].set(np.log(tau_x[np.argmax(tau_n)]))
+        # lognom_out = lognom_mod.fit(tau_n, lognom_pars, x=tau_x)
+        # print(lognom_out.fit_report())
+        # tau_mean = np.exp(lognom_out.params.valuesdict()['center']+(lognom_out.params.valuesdict()['sigma']**2)/2)
+        # fit_tau = np.linspace(tau_x[0], tau_x[-1], 200)
+        # print(tau_mean)
+        # ax_tau.plot(fit_tau, lognom_out.eval(x=fit_tau), zorder=6)
+
+
 
         fig_amp = self.plt_obj.figure('amp_hist')
         ax_amp = fig_amp.add_subplot(111)
@@ -646,9 +689,144 @@ class Taudraw():
         ax_amp.set_xlabel('Amp. [rad]')
         ax_amp.set_ylabel('events')
         ax_amp.grid(True, zorder=0)
-        amp_n, amp_bins, amp_patches = ax_amp.hist(self.combined_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5)
+        amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5)
+        amp_n_bins = np.hstack((amp_n.reshape(-1,1), amp_bins[:-1].reshape(-1,1)))
+
+        fig_area = self.plt_obj.figure('area_hist')
+        ax_area = fig_area.add_subplot(111)
+        ax_area.set_title('Area histogram')
+        ax_area.set_xlabel('area [$\\mu s \\cdot$ rad]')
+        ax_area.set_ylabel('events')
+        ax_area.grid(True, zorder=0)
+        area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5)
+        area_n_bins = np.hstack((area_n.reshape(-1,1), area_bins[:-1].reshape(-1,1)))
+
+        fig_tvsAmp = self.plt_obj.figure('tvsAmp_hist')
+        ax_tvsAmp = fig_tvsAmp.add_subplot(111)
+        ax_tvsAmp.set_title('$\\tau$ vs Amp histogram')
+        ax_tvsAmp.set_xlabel('$\\tau$. [$\\mu$ s]')
+        ax_tvsAmp.set_ylabel('Amp. [rad]')
+        ax_tvsAmp.grid(True, zorder=0)
+        tvsAmp_h, tau_tvsAmp_xedges, tau_tvsAmp_yedges, tvsAmp_im = ax_tvsAmp.hist2d(cut_df['phase_tau']*1e6, cut_df['phase_Amp'], bins=options['avt_bins'], range=[options['avt_tau_min_max'], options['avt_amp_min_max']], cmap='jet', cmin=1.0, zorder=5)
+        self.plt_obj.colorbar(tvsAmp_im, ax=ax_tvsAmp)
 
 
+        if(options['save']==True):
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                self.plt_obj.tight_layout()
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
+            np.savetxt(self.save_dir+'amp_hist.dat', amp_n_bins, delimiter=' ', header='n bins')
+            np.savetxt(self.save_dir+'tau_hist.dat', tau_n_bins, delimiter=' ', header='n bins')
+            np.savetxt(self.save_dir+'area_hist.dat', area_n_bins, delimiter=' ', header='n bins')
 
-    
+
+                
+
+    def plot_tod_histogram(self, **kwargs):
+        failed_amp = np.array([])
+        noise_amp = np.array([])
+        signal_amp = np.array([])
+        noise_area = np.array([])
+        signal_area = np.array([])
+
+        for trgholder in self.trg_file_dict.values():
+            # for failed_shot in trgholder.failed_list:
+            #     tmp_failed = failed_shot.phase
+            #     failed_amp = np.append(failed_amp, tmp_failed)
+            for signal in trgholder.oneshot_list:
+                noise_amp = np.append(noise_amp, signal.phase[:signal.phase_fit_range[0]-1])
+                signal_amp = np.append(signal_amp, signal.phase[signal.phase_fit_range[0]-1:])
+
+                signal_area = np.append(signal_area, np.sum(signal.phase[signal.phase_fit_range[0]-1:]))
+                noise_area = np.append(noise_area, np.sum(signal.phase[:signal.phase_fit_range[0]-1])*len(signal.time[signal.phase_fit_range[0]-1:])/len(signal.time[:signal.phase_fit_range[0]-1]))
+
+        options = {'save':False,
+        'sn_amp_bins':100,
+        'sn_amp_min':signal_amp.min(),
+        'sn_amp_max':signal_amp.max(),
+        'sn_sbt_amp_min':signal_amp.min(),
+        'sn_sbt_amp_max':signal_amp.max(),
+        'sn_area_bins':100,
+        'sn_area_min':signal_area.min(),
+        'sn_area_max':signal_area.max(),
+        'cut':[0]}
+        options.update(kwargs)
+
+        signal_amp_weights = np.ones(len(signal_amp))/len(signal_amp)
+        noise_amp_weights = np.ones(len(noise_amp))/len(noise_amp)
+        
+        fig_sn_amp = self.plt_obj.figure('sig_amp_hist')
+        ax_sn_amp = fig_sn_amp.add_subplot(111)
+        ax_sn_amp.set_title('Signal range and Noise range Phase histogram')
+        ax_sn_amp.set_xlabel('Phase [rad]')
+        ax_sn_amp.set_ylabel('events/$\\mu s$')
+        ax_sn_amp.grid(True, zorder=0)
+        sig_amp_n, sig_amp_bins, sig_amp_patches = ax_sn_amp.hist(signal_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=5, label='signal', weights=signal_amp_weights, color='steelblue')
+        noise_amp_n, noise_amp_bins, noise_amp_patches = ax_sn_amp.hist(noise_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=6, label='noise', alpha=0.5, weights=noise_amp_weights, color='orange')
+        sig_amp_n_bins = np.hstack((sig_amp_n.reshape(-1,1), sig_amp_bins[:-1].reshape(-1,1)))
+        noise_amp_n_bins = np.hstack((noise_amp_n.reshape(-1,1), noise_amp_bins[:-1].reshape(-1,1)))
+        amp_n_bins = np.hstack((sig_amp_n_bins, noise_amp_n_bins))
+        self.plt_obj.legend()
+        
+        # fig_stack_amp = self.plt_obj.figure('sn_amp_stack_hist')
+        # ax_stack_amp = fig_stack_amp.add_subplot(111)
+        # ax_stack_amp.set_title('Signal and Noise Amp. histogram (stacked)')
+        # ax_stack_amp.set_xlabel('Amp. [rad]')
+        # ax_stack_amp.set_ylabel('events/all events')
+        # ax_stack_amp.grid(True, zorder=0)
+        # ax_stack_amp.hist((noise_amp, signal_amp), bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), weights=(noise_amp_weights, signal_amp_weights), np.ones(len(signal_amp))/(len(signal_amp)+len(noise_amp))), histtype='barstacked', zorder=5, label=('noise', 'signal'), color=('orange', 'steelblue'))
+        # self.plt_obj.legend()
+
+        sig_amp_sbt_weights = np.ones(len(signal_amp))/(2*len(signal_amp))
+        noise_amp_sbt_weights = np.ones(len(noise_amp))/(2*len(signal_amp))*len(signal_amp)/len(noise_amp)
+        
+        sig_amp_sbt_n, sig_amp_sbt_bins = np.histogram(signal_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']))
+        noise_amp_sbt_n, noise_amp_sbt_bins = np.histogram(noise_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']))
+        
+        sig_amp_sbt_n_bins = np.hstack((sig_amp_sbt_n.reshape(-1,1), sig_amp_sbt_bins[:-1].reshape(-1,1)))
+        noise_amp_sbt_n_bins = np.hstack((noise_amp_sbt_n.reshape(-1,1), noise_amp_sbt_bins[:-1].reshape(-1,1)))
+        amp_sbt_n_bins = np.hstack((sig_amp_sbt_n_bins, noise_amp_sbt_n_bins))
+
+        fig_sbt_amp = self.plt_obj.figure('sn_amp_subtract_hist')
+        ax_sbt_amp = fig_sbt_amp.add_subplot(111)
+        ax_sbt_amp.set_title('Subtracted Phase histogram (Signal range - Noise range)')
+        ax_sbt_amp.set_xlabel('Phase [rad]')
+        ax_sbt_amp.set_ylabel('$\\Delta$ events/$\\mu s$')
+        ax_sbt_amp.set_xlim(options['sn_sbt_amp_min'], options['sn_sbt_amp_max'])
+        ax_sbt_amp.grid(True, zorder=0)
+        ax_sbt_amp.bar(sig_amp_sbt_bins[:-1], sig_amp_sbt_n/len(signal_amp)-noise_amp_sbt_n/len(noise_amp), width=(sig_amp_sbt_bins[-1]-sig_amp_sbt_bins[-2]), label='subtract', color='forestgreen', zorder=5)
+        #ax_sbt_amp.bar(sig_amp_sbt_bins[:-1], sig_amp_sbt_n/len(signal_amp), width=(sig_amp_sbt_bins[-1]-sig_amp_sbt_bins[-2]), label='signal range', color='steelblue', zorder=3)
+        #ax_sbt_amp.bar(sig_amp_sbt_bins[:-1], noise_amp_sbt_n/len(noise_amp), width=(sig_amp_sbt_bins[-1]-sig_amp_sbt_bins[-2]), label='noise range', color='orange', zorder=4)
+        self.plt_obj.legend()
+
+        # signal_area_weights = np.ones(len(signal_area))/len(signal_area)
+        # noise_area_weights = np.ones(len(noise_area))/len(noise_area)
+
+        # fig_sn_area = self.plt_obj.figure('sig_area_hist')
+        # ax_sn_area = fig_sn_area.add_subplot(111)
+        # ax_sn_area.set_title('Signal and Noise area histogram')
+        # ax_sn_area.set_xlabel('area/one signal [rad $\\cdot \\mu$s]')
+        # ax_sn_area.set_ylabel('rate')
+        # ax_sn_area.grid(True, zorder=0)
+        # sig_area_n, sig_area_bins, sig_area_patches = ax_sn_area.hist(signal_area, bins=options['sn_area_bins'], range=(options['sn_area_min'], options['sn_area_max']), zorder=5, label='signal', weights=signal_area_weights, color='steelblue')
+        # noise_area_n, noise_area_bins, noise_area_patches = ax_sn_area.hist(noise_area, bins=options['sn_area_bins'], range=(options['sn_area_min'], options['sn_area_max']), zorder=6, label='noise', alpha=0.5, weights=noise_area_weights, color='orange')
+        # self.plt_obj.legend()
+        
+        # fig_stack_area = self.plt_obj.figure('sn_area_stack_hist')
+        # ax_stack_area = fig_stack_area.add_subplot(111)
+        # ax_stack_area.set_title('Signal and Noise area histogram (stacked)')
+        # ax_stack_area.set_xlabel('area/one signal [rad $\\cdot \\mu$s]')
+        # ax_stack_area.set_ylabel('rate')
+        # ax_stack_area.grid(True, zorder=0)
+        # ax_stack_area.hist((noise_area, signal_area), bins=options['sn_area_bins'], range=(options['sn_area_min'], options['sn_area_max']), weights=(np.ones(len(noise_area))/(len(signal_area)+len(noise_area)), np.ones(len(signal_area))/(len(signal_area)+len(noise_area))), histtype='barstacked', zorder=5, label=('noise', 'signal'), color=('orange', 'steelblue'))
+        # self.plt_obj.legend()
+
+        if(options['save']==True):
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                self.plt_obj.tight_layout()
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
+            np.savetxt(self.save_dir + 'tod_amp_hist.dat', amp_n_bins, delimiter=' ', header='signal_n signal_bins noise_n noise_bins')
+            np.savetxt(self.save_dir + 'tod_amp_sbt_hist.dat', amp_sbt_n_bins, delimiter=' ', header='signal_n signal_bins noise_n noise_bins')
 
