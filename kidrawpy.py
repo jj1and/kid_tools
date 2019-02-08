@@ -75,6 +75,8 @@ class Kidraw():
         phase = np.arctan2(self.gao_obj.Q, self.gao_obj.I)
         smooth_phase = self.gao_obj.phase_smoother(phase)
 
+        fr_index = np.argmin(np.abs(self.fr-self.gao_obj.f))
+
         fig_IQ = self.plt_obj.figure('IQ')
         ax_IQ = fig_IQ.add_subplot(111)
         ax_IQ.tick_params(direction='in')
@@ -87,6 +89,7 @@ class Kidraw():
         ax_IQ.scatter(x, y, label="I/Q (removed tau)", color='b')
         ax_IQ.scatter(xc_c, yc_c, label="I/Q (centerd)", color='g')
         ax_IQ.scatter(self.xc, self.yc, label='circle center', color='k')
+        ax_IQ.scatter(xc_c[fr_index], yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^')
 
         if(self.fine_fitting_flag==False):
             fit_f = np.linspace(self.gao_obj.fine_fit_range[0], self.gao_obj.fine_fit_range[1], 100)
