@@ -54,6 +54,7 @@ class Kidraw():
         self.fr = fit_params[4]
         self.Qr = fit_params[5]
         self.phi_0 = fit_params[6]
+        return fit_params
 
     def plot_sweep(self, **kwargs):
         options = {'save':False,
