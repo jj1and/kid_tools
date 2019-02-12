@@ -614,8 +614,10 @@ class Taudraw():
 
         plot_trgholder = self.trg_file_dict[options['trg_fname']]
         if(options['noise_plot']==True):
+            cnt = 0
             while(plot_trgholder.failed_list==[]):
-                plot_trgholder = self.trg_file_dict[options['trg_fname']+1]
+                plot_trgholder = self.trg_file_dict[self.trg_swp_file_list[cnt][0]]
+                cnt +=1
             if(len(plot_trgholder.failed_list)>=(options['trg_index']+1)):
                 time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
             else:
@@ -624,8 +626,10 @@ class Taudraw():
                 time, phase = plot_trgholder.failed_list[0].output_data()
                 trg_ax.plot(time, phase)
         elif(options['noise_plot']==False):
+            cnt = 0
             while(plot_trgholder.oneshot_list==[]):
-                plot_trgholder = self.trg_file_dict[options['trg_fname']+1]
+                plot_trgholder = self.trg_file_dict[self.trg_swp_file_list[cnt][0]]
+                cnt += 1
             if(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
                 time, phase = plot_trgholder.oneshot_list[options['trg_index']].output_data()
                 fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
