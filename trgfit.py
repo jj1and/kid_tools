@@ -29,10 +29,10 @@ class Oneshot():
         fh_std = np.std(self.phase[0:options['divide_index']])
         lh_std = np.std(self.phase[options['divide_index']:])
         std_ratio = lh_std/fh_std
-        if((fh_skew<options['skew_ther'])&(std_ratio<options['std_ratio_ther'])):
-            self.signal_flag = True
-        else:
+        if((fh_skew>options['skew_ther'])&(std_ratio>options['std_ratio_ther'])):
             self.signal_flag = False
+        else:
+            self.signal_flag = True
         self.fh_skew = fh_skew
         self.std_ratio = std_ratio
         return self.signal_flag
