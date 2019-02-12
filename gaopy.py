@@ -14,6 +14,7 @@ class Gao():
         self.save_dir = './'
         self.sg = sg_freq
         self.tod_freq = 0.0
+        self.fine_fit_redchi_ther = 1.0
         self.comb_freq_amp=np.ndarray([])
         self.comb_freq_phase=np.ndarray([])
         self.theta_fit_range = np.array([])
@@ -49,8 +50,19 @@ class Gao():
                 tau, xc, yc, r, fr, Qr, Qc, phi_0 = util.fit_file_reader(options["load_fit_file"])
             elif(fit_params!=()):
                 tau, xc, yc, r, fr, Qr, phi_0 = fit_params 
-            else:
+            elif(self.lmfit_result.redchi<self.fine_fit_redchi_ther ):
                 params_dict = self.lmfit_result.params.valuesdict()
+                tau = params_dict['tau']
+                fr = params_dict['fr']
+                Qr = params_dict['qr']
+                phi_0 = params_dict['phi_0']
+                xc = circle_params_dict['xc']
+                yc = circle_params_dict['yc']
+                r = circle_params_dict['r']
+            else:
+                print("fine fitting seems to be failed")
+                params_dict = self.lmfit_init_params.valuesdict()
+                circle_params_dict = self.lmfit_init_circle_params.valuesdict()
                 tau = params_dict['tau']
                 fr = params_dict['fr']
                 Qr = params_dict['qr']
@@ -424,7 +436,10 @@ class Gao():
         phi_0 = theta_0 - alpha
         Qc = Qr*(np.sqrt(xc**2+yc**2)+r)/(2*r)
         Qi = Qr*Qc/(Qc-Qr)
-        a = (self.I[0]+self.Q[0]*1j)*np.exp(2j*np.pi*self.f[0]*tau)/(1-Qr*fr*np.exp(1j*phi_0)/(Qc*fr+2j*Qr*Qc*(self.f[0]-fr)))
+
+        f1_index = np.argmin(np.abs(fr-fr/Qr/2 -self.f))
+        #a = (self.I[0]+self.Q[0]*1j)*np.exp(2j*np.pi*self.f[0]*tau)/(1-Qr*fr*np.exp(1j*phi_0)/(Qc*fr+2j*Qr*Qc*(self.f[0]-fr)))
+        a = (self.I[f1_index]+self.Q[f1_index]*1j)*np.exp(2j*np.pi*self.f[f1_index]*tau)/(1-Qr*fr*np.exp(1j*phi_0)/(Qc*fr+2j*Qr*Qc*(self.f[f1_index]-fr)))
         r_a = np.real(a)
         i_a = np.imag(a)
 
@@ -475,16 +490,22 @@ class Gao():
         print("------------------------------------------")
         options={"save_csv":False,
                  "fn_fit_range":False,
-                 "fn_fr_min_max":[self.lmfit_init_params.valuesdict()['fr']/1.0E6, 0.1, 0.2]}
+                 "fn_fr_min_max":[self.lmfit_init_params.valuesdict()['fr']/1.0E6, 0.1, 0.2],
+                 "red_chi_ther":self.fine_fit_redchi_ther}
         options.update(kwargs)
+        if(options["red_chi_ther"]!=self.fine_fit_redchi_ther):
+            self.fine_fit_redchi_ther = options["red_chi_ther"]
 
         if(options["fn_fit_range"]==True):
             fr_MHz, min_MHz, max_MHz = options["fn_fr_min_max"]
             
         else:
             fr_MHz = self.lmfit_init_params.valuesdict()['fr']/1.0e6
-            min_MHz = (fr_MHz-self.theta_fit_range[0]/1.0e6)/2
-            max_MHz = (self.theta_fit_range[1]/1.0e6-fr_MHz)/2
+            qr = self.lmfit_init_params.valuesdict()['qr']
+            min_MHz = (fr_MHz/qr)
+            max_MHz = (fr_MHz/qr)
+            # min_MHz = (fr_MHz-self.theta_fit_range[0]/1.0e6)/2
+            # max_MHz = (self.theta_fit_range[1]/1.0e6-fr_MHz)/2
         fit_I, fit_Q, fit_f = self.set_fine_fit_range(self.I, self.Q, self.f, fr_MHz, min_MHz, max_MHz)
 
         #calc eps_data range wa nantonaku
@@ -495,7 +516,24 @@ class Gao():
         ydata = fit_I + fit_Q*1j
         xdata = fit_f
 
-        self.lmfit_result = minimizer.minimize(fn.t21_func_residual, self.lmfit_init_params, args=(xdata, ydata, eps_data))
+        for cnt in range(5):
+            if(cnt==0):
+                proto_lmfit_result_params = self.lmfit_init_params
+            
+            if(cnt<2):
+                lmfit_result = minimizer.minimize(fn.t21_func_residual, proto_lmfit_result_params, args=(xdata, ydata, eps_data))
+            elif(cnt>=2):
+                lmfit_result = minimizer.minimize(fn.t21_func_residual, proto_lmfit_result_params, args=(xdata, ydata, eps_data), method='powell')
+            
+            if(cnt==4):
+                self.lmfit_result = lmfit_result
+            
+            if(lmfit_result.redchi<self.fine_fit_redchi_ther):
+                self.lmfit_result = lmfit_result
+                break
+            else:
+                proto_lmfit_result_params = lmfit_result.params
+        #self.lmfit_result = minimizer.minimize(fn.t21_func_residual, proto1_lmfit_result.params, args=(xdata, ydata, eps_data), method='powell')
 
         #exp_IQ = fn.t21_func(fit_f, self.lmfit_result.params)
         params_dict = self.lmfit_result.params.valuesdict()
@@ -812,10 +850,12 @@ class Gaotau(Gao):
                  "loops":False}
         options.update(kwargs)
 
-        tau, xc, yc, r, fr, Qr, phi_0 = self.get_fit_params(*fit_params, **kwargs)
-
         trg_tod_data = np.genfromtxt(trg_file_name, delimiter=" ")
         time = trg_tod_data[:, 0]/(sample_rate*1000)
+        trg_tod_I = trg_tod_data[:, 1]*sample_rate
+        trg_tod_Q = trg_tod_data[:, 2]*sample_rate
+        xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
+        theta = np.arctan2(yc_c, xc_c)
 
         trg_header_index = np.where(time==0.0)
         cnt = 0
@@ -828,12 +868,8 @@ class Gaotau(Gao):
                     break
             else:
                 stop = trg_header_index[0][cnt+1]
-            trg_tod_I = trg_tod_data[start:stop, 1]*sample_rate
-            trg_tod_Q = trg_tod_data[start:stop, 2]*sample_rate
-            xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
-            theta = np.arctan2(yc_c, xc_c)
             one_trg_time = time[start:stop]
-            one_trg_phase = self.phase_smoother(theta)
+            one_trg_phase = self.phase_smoother(theta[start:stop])
             if(cnt==0):
                 one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
                 trg_set = np.array([one_trg])

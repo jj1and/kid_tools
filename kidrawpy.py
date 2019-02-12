@@ -36,25 +36,13 @@ class Kidraw():
             if(options['avoid_fine_fit']==True):
                 raise ValueError("avoid fine fitting")
             else:
-                pass
-            fine_fit_params = self.gao_obj.fine_fit(**kwargs)
-            fit_params = fine_fit_params
-            self.fine_fitting_flag = False
-        except AttributeError:
-            print("fine fitting : Failed")
-            fit_params = coarse_fit_params
+                self.gao_obj.fine_fit(**kwargs)
+                self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0 = self.gao_obj.get_fit_params()
         except ValueError:
-            print("fine fitting : Failed")
-            fit_params = coarse_fit_params
+            print("fine fitting : avoided")
+            self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0 = coarse_fit_params
 
-        self.tau = fit_params[0]
-        self.xc = fit_params[1]
-        self.yc = fit_params[2]
-        self.r = fit_params[3]
-        self.fr = fit_params[4]
-        self.Qr = fit_params[5]
-        self.phi_0 = fit_params[6]
-        return fit_params
+        return [self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0]
 
     def plot_sweep(self, **kwargs):
         options = {'save':False,
@@ -416,6 +404,10 @@ class Taudraw():
         self.fit_info = pd.DataFrame([])
         self.swp_params_data = pd.DataFrame([])
         self.save_dir = './'
+        self.tot_h = 0.0
+        self.fh_skew_ther = -0.60
+        self.std_ratio_ther = 0.80
+        self.divide_index = 200
         self.plt_obj = plt
         self.plt_obj.style.use('default')
         for trg_swp_file in trg_swp_file_list:
@@ -429,6 +421,7 @@ class Taudraw():
             self.trg_spr_freq_dict[trg_fname] = [sample_rate, trg_freq]
         self.trg_file_dict = {}
         self.combined_df = pd.DataFrame([])
+        self.failed_combined_df = pd.DataFrame([])
 
     def set_save_dir(self, save_dir='./'):
         self.save_dir = save_dir
@@ -449,12 +442,12 @@ class Taudraw():
                         raise ValueError()
 
                 fine_fit_params = self.gao_obj_dict[trg_file].fine_fit(**kwargs)
-                if((self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3))==False):
-                    print("fine fitting : Failed")
-                    fit_params = coarse_fit_params
-                elif(self.gao_obj_dict[trg_file].lmfit_result.ier in (1, 2, 3)):
-                    fit_params = fine_fit_params
-                fine_fit_success = self.gao_obj_dict[trg_file].lmfit_result.success
+                tau, xc, yc, r, fr, Qr, phi_0 = self.gao_obj_dict[trg_file].get_fit_params()
+                fit_params = [tau, xc, yc, r, fr, Qr, phi_0]
+                if(self.gao_obj_dict[trg_file].lmfit_result.redchi>5):
+                    fine_fit_success = False
+                elif(self.gao_obj_dict[trg_file].lmfit_result.redchi<5):
+                    fine_fit_success = True
             except ValueError:
                 print("fine fitting : Avoid")
                 fit_params = coarse_fit_params
@@ -467,19 +460,35 @@ class Taudraw():
 
 
     def load_trg(self, **kwargs):
+        options = {
+        'total_time':0.0,
+        'skew_ther':-0.60, 
+        'std_ratio_ther':0.80, 
+        'divide_index':200,
+        }
+        options.update(kwargs)
+        self.fh_skew_ther = options['skew_ther']
+        self.std_ratio_ther = options['std_ratio_ther']
+        self.divide_index = options['divide_index']
         header = ['file_name', 'succeeded', 'failed', 'total']
         fit_info_list = [header]
         for trg_file in self.trg_spr_freq_dict.keys():
             print("loading" + trg_file + "...")
             trg_set = self.gao_obj_dict[trg_file].tod2trg(trg_file, self.trg_spr_freq_dict[trg_file][0], self.trg_spr_freq_dict[trg_file][1])
             trgholder = trgfit.Trgholder(self.gao_obj_dict[trg_file].swp_file_name, trg_file, self.trg_spr_freq_dict[trg_file][0])
-            trgholder.analyze_trg(trg_set, **kwargs)
+            trgholder.analyze_trg(trg_set, **options)
             self.trg_file_dict[trg_file] = trgholder
             tmp_row = [trg_file.split('/')[-2]+'/'+trg_file.split('/')[-1], len(trgholder.oneshot_list), len(trgholder.failed_list), len(trgholder.oneshot_list)+len(trgholder.failed_list)]
             fit_info_list.append(tmp_row)
         fit_info = pd.DataFrame(fit_info_list[1:], columns=header)
         self.fit_info = fit_info.set_index('file_name')
         self.combined_df = pd.concat([trgholder.analyzed_data for trgholder in self.trg_file_dict.values()], keys=[trg_fname.split('/')[-2]+'/'+trg_fname.split('/')[-1] for trg_fname in self.trg_file_dict.keys()])
+        self.failed_combined_df = pd.concat([trgholder.analyzed_failed_data for trgholder in self.trg_file_dict.values()], keys=[trg_fname.split('/')[-2]+'/'+trg_fname.split('/')[-1] for trg_fname in self.trg_file_dict.keys()])
+        if(options['total_time']==0.0):
+            self.tot_h = 20*len(self.trg_file_dict.keys())/60.0
+        elif(options['total_time']>0.0):
+            self.tot_h = options['total_time']/60.0
+        print('total_time[hour] : {0:.1f}'.format(self.tot_h))
         pd.options.display.float_format = '{:.2e}'.format
 
     def plot_sweep(self, **kwargs):
@@ -633,7 +642,9 @@ class Taudraw():
 
 
         trg_ax.plot(time*1e6, phase, zorder=5)
-        
+        ymin, ymax = trg_ax.get_ylim()
+        trg_ax.plot(np.ones(3)*time[self.divide_index]*1e6, np.linspace(ymin-1.0, ymax+1.0, 3), color='r', linestyle=':', label='divide line')
+        trg_ax.set_ylim(ymin, ymax)
         self.plt_obj.legend()
         if(options['save']==True):
             save_fig = self.plt_obj.figure('one_trg')
@@ -644,18 +655,18 @@ class Taudraw():
 
     def plot_histogram(self, **kwargs):
         options = {'save':False,
-        'tau_bins':100,
-        'tau_min':self.combined_df['phase_tau'].min()*1e6,
+        'tau_bins':int(round(np.log2(len(self.combined_df['phase_tau']))+1)),
+        'tau_min':0.0,
         'tau_max':self.combined_df['phase_tau'].max()*1e6,
-        'amp_bins':100,
-        'amp_min':self.combined_df['phase_Amp'].min(),
+        'amp_bins':int(round(np.log2(len(self.combined_df['phase_Amp']))+1)),
+        'amp_min':0.0,
         'amp_max':self.combined_df['phase_Amp'].max(),
-        'area_bins':100,
-        'area_min':self.combined_df['phase_area'].min()*1e6,
+        'area_bins':int(round(np.log2(len(self.combined_df['phase_area']))+1)),
+        'area_min':0.0,
         'area_max':self.combined_df['phase_area'].max()*1e6,
-        'avt_tau_min_max':[self.combined_df['phase_tau'].min()*1e6, self.combined_df['phase_tau'].max()*1e6],
-        'avt_amp_min_max':[self.combined_df['phase_Amp'].min(), self.combined_df['phase_Amp'].max()],
-        'avt_bins':[100, 100],
+        'avt_tau_min_max':[0.0, self.combined_df['phase_tau'].max()*1e6],
+        'avt_amp_min_max':[0.0, self.combined_df['phase_Amp'].max()],
+        'avt_bins':[int(round(np.log2(len(self.combined_df['phase_tau']))+1)), int(round(np.log2(len(self.combined_df['phase_Amp']))+1))],
         'cut':[0]}
         options.update(kwargs)
 
@@ -664,13 +675,16 @@ class Taudraw():
         elif(len(options['cut'])!=1):
             cut_df = self.combined_df[options['cut']]
 
+        # num of erntries of 'phase_tau', 'phase_Amp', 'phase_area' and also 'phase_bias' are the same
+        tot_weights = np.ones(len(cut_df['phase_tau']))/self.tot_h
+
         fig_tau = self.plt_obj.figure('tau_hist')
         ax_tau = fig_tau.add_subplot(111)
         ax_tau.set_title('$\\tau$ histogram')
         ax_tau.set_xlabel('$\\tau$ [$\\mu s$]')
-        ax_tau.set_ylabel('events')
+        ax_tau.set_ylabel('events/hour')
         ax_tau.grid(True, zorder=0)
-        tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5)
+        tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5, color='steelblue', weights=tot_weights)
         tau_n_bins = np.hstack((tau_n.reshape(-1,1), tau_bins[:-1].reshape(-1,1)))
         # tau_bin_width = tau_bins[-1]-tau_bins[-2]
         # tau_x = tau_bins[:-1]+tau_bin_width/2
@@ -691,18 +705,18 @@ class Taudraw():
         ax_amp = fig_amp.add_subplot(111)
         ax_amp.set_title('Amp. histogram')
         ax_amp.set_xlabel('Amp. [rad]')
-        ax_amp.set_ylabel('events')
+        ax_amp.set_ylabel('events/hour')
         ax_amp.grid(True, zorder=0)
-        amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5)
+        amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5, color='crimson', weights=tot_weights)
         amp_n_bins = np.hstack((amp_n.reshape(-1,1), amp_bins[:-1].reshape(-1,1)))
 
         fig_area = self.plt_obj.figure('area_hist')
         ax_area = fig_area.add_subplot(111)
         ax_area.set_title('Area histogram')
         ax_area.set_xlabel('area [$\\mu s \\cdot$ rad]')
-        ax_area.set_ylabel('events')
+        ax_area.set_ylabel('events/hour')
         ax_area.grid(True, zorder=0)
-        area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5)
+        area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5, color='green', weights=tot_weights)
         area_n_bins = np.hstack((area_n.reshape(-1,1), area_bins[:-1].reshape(-1,1)))
 
         fig_tvsAmp = self.plt_obj.figure('tvsAmp_hist')
@@ -711,8 +725,10 @@ class Taudraw():
         ax_tvsAmp.set_xlabel('$\\tau$. [$\\mu$ s]')
         ax_tvsAmp.set_ylabel('Amp. [rad]')
         ax_tvsAmp.grid(True, zorder=0)
-        tvsAmp_h, tau_tvsAmp_xedges, tau_tvsAmp_yedges, tvsAmp_im = ax_tvsAmp.hist2d(cut_df['phase_tau']*1e6, cut_df['phase_Amp'], bins=options['avt_bins'], range=[options['avt_tau_min_max'], options['avt_amp_min_max']], cmap='jet', cmin=1.0, zorder=5)
-        self.plt_obj.colorbar(tvsAmp_im, ax=ax_tvsAmp)
+        tvsAmp_h, tau_tvsAmp_xedges, tau_tvsAmp_yedges, tvsAmp_im = ax_tvsAmp.hist2d(cut_df['phase_tau']*1e6, cut_df['phase_Amp'], bins=options['avt_bins'], range=[options['avt_tau_min_max'], options['avt_amp_min_max']], cmap='jet', zorder=5, weights=tot_weights)
+        tvsAmp_im.cmap.set_under('w')
+        tvsAmp_cbar = self.plt_obj.colorbar(tvsAmp_im, ax=ax_tvsAmp, extend='min')
+        tvsAmp_cbar.set_label('events/hour')
 
 
         if(options['save']==True):
@@ -724,6 +740,118 @@ class Taudraw():
             np.savetxt(self.save_dir+'tau_hist.dat', tau_n_bins, delimiter=' ', header='n bins')
             np.savetxt(self.save_dir+'area_hist.dat', area_n_bins, delimiter=' ', header='n bins')
 
+
+    def plot_stats(self, **kwargs):
+        options = {
+        'cut':[0]
+        }
+        if(len(options['cut'])==1):
+            cut_df = pd.concat([self.combined_df, self.failed_combined_df], axis=0, sort=False)
+        elif(len(options['cut'])!=1):
+            cut_df = pd.concat([self.combined_df[options['cut']], self.failed_combined_df], axis=0, sort=False)
+
+        options2 = {
+        'save':False,
+        'svsr_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
+        'svsr_skew_min_max':[cut_df['fh_skew'].min(), cut_df['fh_skew'].max()],
+        'svsr_bins':[int(round(np.log2(len(cut_df['fh_skew']))+1)), int(round(np.log2(len(cut_df['std_ratio']))+1))],
+        'svt_tau_min_max':[0.0, cut_df['phase_tau'].max()*1e6],
+        'svt_skew_min_max':[cut_df['fh_skew'].min(), cut_df['fh_skew'].max()],
+        'svt_bins':[int(round(np.log2(len(cut_df['fh_skew']))+1)), int(round(np.log2(len(cut_df['phase_tau']))+1))],
+        'srvt_tau_min_max':[0.0, cut_df['phase_tau'].max()*1e6],
+        'srvt_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
+        'srvt_bins':[int(round(np.log2(len(cut_df['std_ratio']))+1)), int(round(np.log2(len(cut_df['phase_tau']))+1))],
+        'svA_Amp_min_max':[0.0, cut_df['phase_Amp'].max()],
+        'svA_skew_min_max':[cut_df['fh_skew'].min(), cut_df['fh_skew'].max()],
+        'svA_bins':[int(round(np.log2(len(cut_df['fh_skew']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))],
+        'srvA_Amp_min_max':[0.0, cut_df['phase_Amp'].max()],
+        'srvA_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
+        'srvA_bins':[int(round(np.log2(len(cut_df['std_ratio']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))]
+        }
+        options.update(options2)
+        options.update(kwargs)
+
+        tot_weights = np.ones(len(cut_df['fh_skew']))/self.tot_h
+
+
+        fig_svsr = self.plt_obj.figure('svsr_hist')
+        ax_svsr = fig_svsr.add_subplot(111)
+        ax_svsr.set_title('first half skew vs std_ratio histogram')
+        ax_svsr.set_ylabel('std ratio [no unit]')
+        ax_svsr.set_xlabel('first half skew [no unit]')
+        ax_svsr.grid(True, zorder=0)
+        svsr_h, svsr_xedges, svsr_yedges, svsr_im = ax_svsr.hist2d(cut_df['fh_skew'], cut_df['std_ratio'], bins=options['svsr_bins'], range=[options['svsr_skew_min_max'], options['svsr_sr_min_max']], cmap='jet', cmin=0.0, zorder=5, weights=tot_weights)
+        svsr_cbar = self.plt_obj.colorbar(svsr_im, ax=ax_svsr)
+        svsr_cbar.set_label('events/hour')
+        svsr_ymin, svsr_ymax = ax_svsr.get_ylim()
+        svsr_xmin, svsr_xmax = ax_svsr.get_xlim()
+        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(svsr_ymin-1.0, svsr_ymax+1.0, 3), color='r', linestyle=':', label='thershold', zorder=10)
+        ax_svsr.plot(np.linspace(svsr_xmin-1.0, svsr_xmax+1.0, 3), self.std_ratio_ther*np.ones(3) ,color='r', linestyle=':', zorder=10)
+        ax_svsr.set_ylim(svsr_ymin, svsr_ymax)
+        ax_svsr.set_xlim(svsr_xmin, svsr_xmax)
+        ax_svsr.legend()
+
+        fig_svt = self.plt_obj.figure('svt_hist')
+        ax_svt = fig_svt.add_subplot(111)
+        ax_svt.set_title('first half skew vs $\\tau$ histogram')
+        ax_svt.set_ylabel('$\\tau$ [$\\mu$ s]')
+        ax_svt.set_xlabel('first half skew. [no unit]')
+        ax_svt.grid(True, zorder=0)
+        svt_h, svt_xedges, svt_yedges, svt_im = ax_svt.hist2d(cut_df['fh_skew'], cut_df['phase_tau']*1e6, bins=options['svt_bins'], range=[options['svt_skew_min_max'], options['svt_tau_min_max']], cmap='jet', cmin=0.0, zorder=5, weights=tot_weights)
+        svt_cbar = self.plt_obj.colorbar(svt_im, ax=ax_svt)
+        svt_cbar.set_label('events/hour')
+        svt_ymin, svt_ymax = ax_svt.get_ylim()
+        ax_svt.plot(self.fh_skew_ther*np.ones(3), np.linspace(svt_ymin-1.0, svt_ymax+1.0, 3), color='r', linestyle=':', label='skew thershold', zorder=6)
+        ax_svt.set_ylim(svt_ymin, svt_ymax)
+        ax_svt.legend()
+
+        fig_srvt = self.plt_obj.figure('srvt_hist')
+        ax_srvt = fig_srvt.add_subplot(111)
+        ax_srvt.set_title('std ratio vs $\\tau$ histogram')
+        ax_srvt.set_ylabel('$\\tau$ [$\\mu$ s]')
+        ax_srvt.set_xlabel('std ratio [no unit]')
+        ax_srvt.grid(True, zorder=0)
+        srvt_h, srvt_xedges, srvt_yedges, srvt_im = ax_srvt.hist2d(cut_df['std_ratio'], cut_df['phase_tau']*1e6, bins=options['srvt_bins'], range=[options['srvt_sr_min_max'], options['srvt_tau_min_max']], cmap='jet', cmin=0.0, zorder=5, weights=tot_weights)
+        srvt_cbar = self.plt_obj.colorbar(srvt_im, ax=ax_srvt)
+        srvt_cbar.set_label('events/hour')
+        srvt_ymin, srvt_ymax = ax_srvt.get_ylim()
+        ax_srvt.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvt_ymin-1.0, srvt_ymax+1.0, 3), color='r', linestyle=':', label='std ratio thershold', zorder=6)
+        ax_srvt.set_ylim(srvt_ymin, srvt_ymax)
+        ax_srvt.legend()
+
+        fig_svA = self.plt_obj.figure('svA_hist')
+        ax_svA = fig_svA.add_subplot(111)
+        ax_svA.set_title('first half skew vs Amp. histogram')
+        ax_svA.set_ylabel('Amp. [rad]')
+        ax_svA.set_xlabel('first half skew. [no unit]')
+        ax_svA.grid(True, zorder=0)
+        svA_h, svA_xedges, svA_yedges, svA_im = ax_svA.hist2d(cut_df['fh_skew'], cut_df['phase_Amp'], bins=options['svA_bins'], range=[options['svA_skew_min_max'], options['svA_Amp_min_max']], cmap='jet', cmin=0.0, zorder=5, weights=tot_weights)
+        svA_cbar = self.plt_obj.colorbar(svA_im, ax=ax_svA)
+        svA_cbar.set_label('events/hour')
+        svA_ymin, svA_ymax = ax_svA.get_ylim()
+        ax_svA.plot(self.fh_skew_ther*np.ones(3), np.linspace(svA_ymin-1.0, svA_ymax+1.0, 3), color='r', linestyle=':', label='skew thershold', zorder=6)
+        ax_svA.set_ylim(svA_ymin, svA_ymax)
+        ax_svA.legend()
+
+        fig_srvA = self.plt_obj.figure('srvA_hist')
+        ax_srvA = fig_srvA.add_subplot(111)
+        ax_srvA.set_title('std ratio vs Amp. histogram')
+        ax_srvA.set_ylabel('Amp. [rad]')
+        ax_srvA.set_xlabel('std ratio [no unit]')
+        ax_srvA.grid(True, zorder=0)
+        srvA_h, srvA_xedges, srvA_yedges, srvA_im = ax_srvA.hist2d(cut_df['std_ratio'], cut_df['phase_Amp'], bins=options['srvA_bins'], range=[options['srvA_sr_min_max'], options['srvA_Amp_min_max']], cmap='jet', cmin=0.0, zorder=5, weights=tot_weights)
+        srvA_cbar = self.plt_obj.colorbar(srvA_im, ax=ax_srvA)
+        srvA_cbar.set_label('events/hour')
+        srvA_ymin, srvA_ymax = ax_srvA.get_ylim()
+        ax_srvA.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvA_ymin-1.0, srvA_ymax+1.0, 3), color='r', linestyle=':', label='std ratio thershold', zorder=6)
+        ax_srvA.set_ylim(srvA_ymin, srvA_ymax)
+        ax_srvA.legend()
+
+        if(options['save']==True):
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                self.plt_obj.tight_layout()
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
 
                 
 
@@ -746,12 +874,12 @@ class Taudraw():
                 noise_area = np.append(noise_area, np.sum(signal.phase[:signal.phase_fit_range[0]-1])*len(signal.time[signal.phase_fit_range[0]-1:])/len(signal.time[:signal.phase_fit_range[0]-1]))
 
         options = {'save':False,
-        'sn_amp_bins':100,
+        'sn_amp_bins':int(round(np.log2(len(signal_amp))+1)),
         'sn_amp_min':signal_amp.min(),
         'sn_amp_max':signal_amp.max(),
         'sn_sbt_amp_min':signal_amp.min(),
         'sn_sbt_amp_max':signal_amp.max(),
-        'sn_area_bins':100,
+        'sn_area_bins':int(round(np.log2(len(signal_area))+1)),
         'sn_area_min':signal_area.min(),
         'sn_area_max':signal_area.max(),
         'cut':[0]}
