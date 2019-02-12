@@ -132,7 +132,7 @@ class Trgholder():
                         tmp_phase_bias = tmp_shot.lmfit_tau_result.params.valuesdict()['phase_bias']
                         tmp_phase_bias_err = np.nan
 
-                        tmp_area = tmp_phase_Amp*tmp_phase_tau*(1-np.exp(-options['t_area_upper']/tmp_phase_tau))
+                        tmp_area = np.abs(tmp_phase_Amp*tmp_phase_tau*(1-np.exp(-options['t_area_upper']/tmp_phase_tau)))
                         tmp_area_err = np.nan
                         tmp_row = [tmp_phase_tau, tmp_phase_tau_err, tmp_phase_Amp, tmp_phase_Amp_err, tmp_area, tmp_area_err, tmp_phase_bias, tmp_phase_bias_err, tmp_shot.fh_skew, tmp_shot.std_ratio]
 

@@ -667,7 +667,7 @@ class Taudraw():
         'tau_min':0.0,
         'tau_max':self.combined_df['phase_tau'].max()*1e6,
         'amp_bins':int(round(np.log2(len(self.combined_df['phase_Amp']))+1)),
-        'amp_min':0.0,
+        'amp_min':self.combined_df['phase_Amp'].min(),
         'amp_max':self.combined_df['phase_Amp'].max(),
         'area_bins':int(round(np.log2(len(self.combined_df['phase_area']))+1)),
         'area_min':0.0,
