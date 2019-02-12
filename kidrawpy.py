@@ -673,7 +673,7 @@ class Taudraw():
         'area_min':0.0,
         'area_max':self.combined_df['phase_area'].max()*1e6,
         'avt_tau_min_max':[0.0, self.combined_df['phase_tau'].max()*1e6],
-        'avt_amp_min_max':[0.0, self.combined_df['phase_Amp'].max()],
+        'avt_amp_min_max':[self.combined_df['phase_Amp'].min(), self.combined_df['phase_Amp'].max()],
         'avt_bins':[int(round(np.log2(len(self.combined_df['phase_tau']))+1)), int(round(np.log2(len(self.combined_df['phase_Amp']))+1))],
         'cut':[0]}
         options.update(kwargs)
@@ -769,10 +769,10 @@ class Taudraw():
         'srvt_tau_min_max':[0.0, cut_df['phase_tau'].max()*1e6],
         'srvt_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
         'srvt_bins':[int(round(np.log2(len(cut_df['std_ratio']))+1)), int(round(np.log2(len(cut_df['phase_tau']))+1))],
-        'svA_Amp_min_max':[0.0, cut_df['phase_Amp'].max()],
+        'svA_Amp_min_max':[cut_df['phase_Amp'].min(), cut_df['phase_Amp'].max()],
         'svA_skew_min_max':[cut_df['fh_skew'].min(), cut_df['fh_skew'].max()],
         'svA_bins':[int(round(np.log2(len(cut_df['fh_skew']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))],
-        'srvA_Amp_min_max':[0.0, cut_df['phase_Amp'].max()],
+        'srvA_Amp_min_max':[cut_df['phase_Amp'].min(), cut_df['phase_Amp'].max()],
         'srvA_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
         'srvA_bins':[int(round(np.log2(len(cut_df['std_ratio']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))]
         }
