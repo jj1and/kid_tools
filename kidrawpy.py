@@ -614,14 +614,18 @@ class Taudraw():
 
         plot_trgholder = self.trg_file_dict[options['trg_fname']]
         if(options['noise_plot']==True):
+            while(plot_trgholder.failed_list==[]):
+                plot_trgholder = self.trg_file_dict[options['trg_fname']+1]
             if(len(plot_trgholder.failed_list)>=(options['trg_index']+1)):
                 time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
             else:
-                print("No trgger waveform was found.")
-                print("plot first failed trigger waveform")
+                print("No noise waveform was found.")
+                print("plot first noise waveform")
                 time, phase = plot_trgholder.failed_list[0].output_data()
                 trg_ax.plot(time, phase)
         elif(options['noise_plot']==False):
+            while(plot_trgholder.oneshot_list==[]):
+                plot_trgholder = self.trg_file_dict[options['trg_fname']+1]
             if(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
                 time, phase = plot_trgholder.oneshot_list[options['trg_index']].output_data()
                 fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
@@ -630,7 +634,7 @@ class Taudraw():
                 params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
                 trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
             else:
-                print("Selected trgger waveform was found.")
+                print("Selected trgger waveform could not be found.")
                 print("plot first trigger waveform")
                 time, phase = plot_trgholder.oneshot_list[0].output_data()
                 options['trg_index']=0
