@@ -507,7 +507,7 @@ class Taudraw():
         plot_Q = self.gao_obj_dict[options['trg_fname']].Q
         plot_f = self.gao_obj_dict[options['trg_fname']].f
         plot_fr, plot_tau, plot_xc, plot_yc, plot_fine_fit_success = self.swp_params_data.loc[options['trg_fname'].split('/')[-2]+'/'+options['trg_fname'].split('/')[-1], ['fr', 'tau', 'xc', 'yc', 'fine_fit_success']]
-        fr_index = np.argmin(np.abs(plot_fr - plot_f))
+        fr_index = int(np.argmin(np.abs(plot_fr - plot_f)))
 
         x, y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(plot_I, plot_Q, plot_f, plot_tau)
         xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(plot_I, plot_Q, plot_f)
