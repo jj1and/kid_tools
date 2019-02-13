@@ -705,7 +705,7 @@ class Taudraw():
         fr_index = np.argmin(np.abs(plot_fr - plot_f))
         spr = self.trg_spr_freq_dict[options['trg_fname']][0]
         trg_freq = self.trg_spr_freq_dict[options['trg_fname']][1]
-        
+
         x, y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(plot_I, plot_Q, plot_f, plot_tau)
         xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(plot_I, plot_Q, plot_f)
         fig_IQ = self.plt_obj.figure('IQ')
@@ -736,8 +736,8 @@ class Taudraw():
             pass
 
         trg_tod_data = np.genfromtxt(options['trg_fname'], delimiter=" ")
-        trg_tod_I = trg_tod_data[:, 1]
-        trg_tod_Q = trg_tod_data[:, 2]
+        trg_tod_I = trg_tod_data[:, 1]*spr
+        trg_tod_Q = trg_tod_data[:, 2]*spr
         xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
         trg_header_index = np.where(trg_tod_data[:, 0]==0.0)
         if(len(trg_header_index[0])<options['triggered_index']):
