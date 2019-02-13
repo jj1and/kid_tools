@@ -506,10 +506,12 @@ class Taudraw():
         plot_I = self.gao_obj_dict[options['trg_fname']].I
         plot_Q = self.gao_obj_dict[options['trg_fname']].Q
         plot_f = self.gao_obj_dict[options['trg_fname']].f
-        plot_tau, plot_xc, plot_yc, plot_fine_fit_success = self.swp_params_data.loc[options['trg_fname'].split('/')[-2]+'/'+options['trg_fname'].split('/')[-1], ['tau', 'xc', 'yc', 'fine_fit_success']]
+        plot_fr, plot_tau, plot_xc, plot_yc, plot_fine_fit_success = self.swp_params_data.loc[options['trg_fname'].split('/')[-2]+'/'+options['trg_fname'].split('/')[-1], ['fr', 'tau', 'xc', 'yc', 'fine_fit_success']]
+        fr_index = np.argmin(np.abs(plot_fr - plot_f))
 
         x, y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(plot_I, plot_Q, plot_f, plot_tau)
         xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(plot_I, plot_Q, plot_f)
+
         
         crs_x, crs_y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(plot_I, plot_Q, plot_f, self.gao_obj_dict[options['trg_fname']].lmfit_init_params['tau']) 
         crs_xc_c, crs_yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(crs_x, crs_y, plot_f, coarse_fit=True, xc=self.gao_obj_dict[options['trg_fname']].lmfit_init_circle_params['xc'], yc=self.gao_obj_dict[options['trg_fname']].lmfit_init_circle_params['yc'])
@@ -533,6 +535,7 @@ class Taudraw():
         ax_IQ.scatter(x, y, label="I/Q (removed tau)", color='b')
         ax_IQ.scatter(xc_c, yc_c, label="I/Q (centerd)", color='g')
         ax_IQ.scatter(plot_xc, plot_yc, label='circle center', color='k')
+        ax_IQ.scatter(plot_xc_c[fr_index], plot_yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^')
 
         if(plot_fine_fit_success==True):
             fit_f = np.linspace(self.gao_obj_dict[options['trg_fname']].fine_fit_range[0], self.gao_obj_dict[options['trg_fname']].fine_fit_range[1], 100)
