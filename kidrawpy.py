@@ -622,39 +622,60 @@ class Taudraw():
 
         plot_trgholder = self.trg_file_dict[options['trg_fname']]
         if(options['noise_plot']==True):
-            cnt = 0
-            while(plot_trgholder.failed_list==[]):
-                plot_trgholder = self.trg_file_dict[self.trg_swp_file_list[cnt][0]]
-                cnt +=1
-            if(len(plot_trgholder.failed_list)>=(options['trg_index']+1)):
-                time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
-            else:
-                print("No noise waveform was found.")
+            if((plot_trgholder.failed_list==[])|len(plot_trgholder.failed_list)<(options['trg_index']+1)):
+                print("Selected noise waveform could not be found.")
                 print("plot first noise waveform")
-                time, phase = plot_trgholder.failed_list[0].output_data()
-                trg_ax.plot(time, phase)
+                cnt = 0
+                while(plot_trgholder.oneshot_list==[]):
+                    options['trg_index']=0
+                    options['trg_fname'] = self.trg_swp_file_list[cnt][0]
+                    plot_trgholder = self.trg_file_dict[options['trg_fname']]
+                    cnt += 1
+                if(plot_trgholder.oneshot_list!=[]):
+                    time, phase = plot_trgholder.failed_list[0].output_data()
+                    trg_ax.plot(time, phase)
+                else:
+                    print("No noise waveform was found.")
+                    print("Cannot plot noise waveform")
+            elif(len(plot_trgholder.failed_list)>=(options['trg_index']+1)):
+                time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
+
         elif(options['noise_plot']==False):
-            cnt = 0
-            while(plot_trgholder.oneshot_list==[]):
-                plot_trgholder = self.trg_file_dict[self.trg_swp_file_list[cnt][0]]
-                cnt += 1
-            if(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
+            if((plot_trgholder.oneshot_list==[])|len(plot_trgholder.oneshot_list)<(options['trg_index']+1)):
+                print("Selected trgger waveform could not be found.")
+                print("plot first trigger waveform")
+                cnt = 0
+                while(plot_trgholder.oneshot_list==[]):
+                    options['trg_index']=0
+                    options['trg_fname'] = self.trg_swp_file_list[cnt][0]
+                    plot_trgholder = self.trg_file_dict[options['trg_fname']]
+                    cnt += 1
+                if(plot_trgholder.oneshot_list!=[]):
+                    fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
+                    fit_time = np.linspace(fit_time_min, fit_time_max)
+                    fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
+                    params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
+                    trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
+                else:
+                    print("No trigger waveform was found.")
+                    print("Cannot plot trigger waveform")
+            elif(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
                 time, phase = plot_trgholder.oneshot_list[options['trg_index']].output_data()
                 fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
                 fit_time = np.linspace(fit_time_min, fit_time_max)
                 fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
                 params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
                 trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
-            else:
-                print("Selected trgger waveform could not be found.")
-                print("plot first trigger waveform")
-                time, phase = plot_trgholder.oneshot_list[0].output_data()
-                options['trg_index']=0
-                fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
-                fit_time = np.linspace(fit_time_min, fit_time_max)
-                fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
-                params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
-                trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
+            # else:
+            #     print("Selected trgger waveform could not be found.")
+            #     print("plot first trigger waveform")
+            #     time, phase = plot_trgholder.oneshot_list[0].output_data()
+            #     options['trg_index']=0
+            #     fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
+            #     fit_time = np.linspace(fit_time_min, fit_time_max)
+            #     fit_phase = fn.phase_tau_func(fit_time, plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params)
+            #     params_row = plot_trgholder.analyzed_data.loc[options['trg_index'],:]
+            #     trg_ax.plot(fit_time*1e6, fit_phase, color='r', label='fit: $\\tau$ = {0:.2e} $\\mu s$'.format(plot_trgholder.oneshot_list[options['trg_index']].lmfit_tau_result.params.valuesdict()['phase_tau']*1e6), zorder=10)
 
 
         trg_ax.plot(time*1e6, phase, zorder=5)
@@ -668,6 +689,80 @@ class Taudraw():
 
         if(options['noise_plot']==False):
             return params_row
+
+    def check_trg(self, **kwargs):
+        options = {'save':False,
+        'triggered_index':0,
+        'trg_fname':self.trg_swp_file_list[0][0],
+        'noise_plot':False,
+        'loc':'upper left'}
+        options.update(kwargs)
+
+        plot_I = self.gao_obj_dict[options['trg_fname']].I
+        plot_Q = self.gao_obj_dict[options['trg_fname']].Q
+        plot_f = self.gao_obj_dict[options['trg_fname']].f
+        plot_fr, plot_tau, plot_xc, plot_yc, plot_fine_fit_success = self.swp_params_data.loc[options['trg_fname'].split('/')[-2]+'/'+options['trg_fname'].split('/')[-1], ['fr', 'tau', 'xc', 'yc', 'fine_fit_success']]
+        fr_index = np.argmin(np.abs(plot_fr - plot_f))
+        spr = trg_freq = self.trg_spr_freq_dict[options['trg_fname']][0]
+        trg_freq = self.trg_spr_freq_dict[options['trg_fname']][1]
+
+        x, y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(plot_I, plot_Q, plot_f, plot_tau)
+        xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(plot_I, plot_Q, plot_f)
+        fig_IQ = self.plt_obj.figure('IQ')
+        ax_IQ = fig_IQ.add_subplot(111)
+        ax_IQ.tick_params(direction='in')
+        ax_IQ.grid(True)
+        ax_IQ.set_title("sweep result")
+        ax_IQ.set_xlabel("I")
+        ax_IQ.set_ylabel("Q")
+        ax_IQ.set_aspect('equal', 'datalim')
+        ax_IQ.scatter(plot_I, plot_Q, label="I/Q", color='r')
+        ax_IQ.scatter(x, y, label="I/Q (removed tau)", color='b')
+        ax_IQ.scatter(xc_c, yc_c, label="I/Q (centerd)", color='g')
+        ax_IQ.scatter(plot_xc, plot_yc, label='circle center', color='k')
+        ax_IQ.scatter(xc_c[fr_index], yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^')
+
+        if(plot_fine_fit_success==True):
+            fit_f = np.linspace(self.gao_obj_dict[options['trg_fname']].fine_fit_range[0], self.gao_obj_dict[options['trg_fname']].fine_fit_range[1], 100)
+            IQ = fn.t21_func(fit_f, self.gao_obj_dict[options['trg_fname']].lmfit_result.params)
+            fit_I = np.real(IQ)
+            fit_Q = np.imag(IQ)
+            fit_x, fit_y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(fit_I, fit_Q, fit_f, plot_tau)
+            fit_xc_c, fit_yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(fit_I, fit_Q, fit_f)
+            ax_IQ.plot(fit_I, fit_Q, label="fit_I/Q", color='y')
+            ax_IQ.plot(fit_x, fit_y, label="fit_I/Q (removed tau)", color='y', linestyle=':')
+            ax_IQ.plot(fit_xc_c, fit_yc_c, label="fit_I/Q (centered)", color='y', linestyle='-.')
+        else:
+            pass
+
+        trg_tod_data = np.genfromtxt(options['trg_fname'], delimiter=" ")
+        trg_tod_I = trg_tod_data[:, 1]*spr
+        trg_tod_Q = trg_tod_data[:, 2]*spr
+        xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
+        trg_header_index = np.where(trg_tod_data[:, 0]==0.0)
+        if(len(trg_header_index[0])<options['triggered_index']):
+            print('Selected triggered index is out of range')
+            options['triggered_index'] = 0
+        else:
+            pass
+        start = trg_header_index[0][options['triggered_index']] 
+        if(options['triggered_index']==trg_header_index[0][-1]):
+            stop = len(trg_tod_data[:, 0])
+        else:
+            stop = trg_header_index[0][options['triggered_index']+1]
+        trg_I = trg_tod_I[start:stop]
+        trg_Q = trg_tod_Q[start:stop]
+
+        trg_x, trg_y = self.gao_obj_dict[options['trg_fname']].remove_tau_effect(trg_I, trg_Q, trg_freq, plot_tau)
+        trg_xc_c, trg_yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(trg_I, trg_Q, trg_freq)
+        ax_IQ.scatter(trg_I, trg_Q, color='w', edgecolors='k', marker='o')
+        ax_IQ.scatter(trg_x, trg_y, color='w', edgecolors='k', marker='o')
+        ax_IQ.scatter(trg_xc_c, trg_yc_c, color='w', edgecolors='k', marker='o')
+        
+        self.plt_obj.legend(loc=options['loc'])
+        self.plt_obj.gca().set_aspect('equal', adjustable='box')
+
+
 
     def plot_histogram(self, **kwargs):
         options = {'save':False,

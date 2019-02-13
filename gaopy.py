@@ -201,7 +201,7 @@ class Gao():
         options = {'std_theta':theta[0]}
         options.update(kwargs)
         mod_theta = deepcopy(theta - options['std_theta'])
-        diff_theta =  np.diff(theta)
+        diff_theta =  np.diff(mod_theta)
         ther = 0.5
         #smp_len = 10
         jumped_indices = np.array([],dtype=int)
