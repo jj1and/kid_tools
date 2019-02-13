@@ -535,7 +535,7 @@ class Taudraw():
         ax_IQ.scatter(x, y, label="I/Q (removed tau)", color='b')
         ax_IQ.scatter(xc_c, yc_c, label="I/Q (centerd)", color='g')
         ax_IQ.scatter(plot_xc, plot_yc, label='circle center', color='k')
-        ax_IQ.scatter(plot_xc_c[fr_index], plot_yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^')
+        ax_IQ.scatter(plot_xc[fr_index], plot_yc[fr_index], label='fr', color='w', edgecolors='k', marker='^')
 
         if(plot_fine_fit_success==True):
             fit_f = np.linspace(self.gao_obj_dict[options['trg_fname']].fine_fit_range[0], self.gao_obj_dict[options['trg_fname']].fine_fit_range[1], 100)
