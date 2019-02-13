@@ -11,7 +11,7 @@ from . import functions as fn
 
 class Kidraw():
     def __init__(self, swp_file_name, sg_freq):
-        self.fine_fitting_flag = True
+        self.fine_fit_success = False
         self.gao_obj = gaopy.Gao(swp_file_name, sg_freq)
         self.save_dir = self.gao_obj.save_dir
         self.tau = 0.0
@@ -37,10 +37,15 @@ class Kidraw():
                 raise ValueError("avoid fine fitting")
             else:
                 self.gao_obj.fine_fit(**kwargs)
+                if(self.gao_obj.lmfit_result.redchi<self.gao_obj.fine_fit_redchi_ther):
+                    self.fine_fit_success = True
+                elif(self.gao_obj.lmfit_result.redchi>=self.gao_obj.fine_fit_redchi_ther):
+                    self.fine_fit_success = False
                 self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0 = self.gao_obj.get_fit_params()
         except ValueError:
             print("fine fitting : avoided")
             self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0 = coarse_fit_params
+            self.fine_fit_success = False
 
         return [self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0]
 
@@ -79,7 +84,7 @@ class Kidraw():
         ax_IQ.scatter(self.xc, self.yc, label='circle center', color='k')
         ax_IQ.scatter(xc_c[fr_index], yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^')
 
-        if(self.fine_fitting_flag==False):
+        if(self.fine_fit_success == True):
             fit_f = np.linspace(self.gao_obj.fine_fit_range[0], self.gao_obj.fine_fit_range[1], 100)
             IQ = fn.t21_func(fit_f, self.gao_obj.lmfit_result.params)
             fit_I = np.real(IQ)
