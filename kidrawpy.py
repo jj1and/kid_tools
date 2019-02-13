@@ -867,6 +867,8 @@ class Taudraw():
         failed_amp = np.array([])
         noise_amp = np.array([])
         signal_amp = np.array([])
+        cr_noise_amp = np.array([])
+        cr_signal_amp = np.array([])
         noise_area = np.array([])
         signal_area = np.array([])
 
@@ -877,7 +879,9 @@ class Taudraw():
             for signal in trgholder.oneshot_list:
                 noise_amp = np.append(noise_amp, signal.phase[:signal.phase_fit_range[0]-1])
                 signal_amp = np.append(signal_amp, signal.phase[signal.phase_fit_range[0]-1:])
-
+                tmp_base = np.mean(signal.phase[:signal.phase_fit_range[0]-1])
+                cr_noise_amp = np.append(cr_noise_amp, signal.phase[:signal.phase_fit_range[0]-1]-tmp_base)
+                cr_signal_amp = np.append(cr_signal_amp, signal.phase[signal.phase_fit_range[0]-1:]-tmp_base)
                 signal_area = np.append(signal_area, np.sum(signal.phase[signal.phase_fit_range[0]-1:]))
                 noise_area = np.append(noise_area, np.sum(signal.phase[:signal.phase_fit_range[0]-1])*len(signal.time[signal.phase_fit_range[0]-1:])/len(signal.time[:signal.phase_fit_range[0]-1]))
 
@@ -885,11 +889,14 @@ class Taudraw():
         'sn_amp_bins':int(round(np.log2(len(signal_amp))+1)),
         'sn_amp_min':signal_amp.min(),
         'sn_amp_max':signal_amp.max(),
-        'sn_sbt_amp_min':signal_amp.min(),
-        'sn_sbt_amp_max':signal_amp.max(),
         'sn_area_bins':int(round(np.log2(len(signal_area))+1)),
         'sn_area_min':signal_area.min(),
         'sn_area_max':signal_area.max(),
+        'cr_sn_amp_bins':int(round(np.log2(len(cr_signal_amp))+1)),
+        'cr_sn_amp_min':cr_signal_amp.min(),
+        'cr_sn_amp_max':cr_signal_amp.max(),
+        'sn_sbt_amp_min':cr_signal_amp.min(),
+        'sn_sbt_amp_max':cr_signal_amp.max(),
         'cut':[0]}
         options.update(kwargs)
 
@@ -908,6 +915,20 @@ class Taudraw():
         noise_amp_n_bins = np.hstack((noise_amp_n.reshape(-1,1), noise_amp_bins[:-1].reshape(-1,1)))
         amp_n_bins = np.hstack((sig_amp_n_bins, noise_amp_n_bins))
         self.plt_obj.legend()
+
+
+        fig_cr_sn_amp = self.plt_obj.figure('cr_sig_amp_hist')
+        ax_cr_sn_amp = fig_cr_sn_amp.add_subplot(111)
+        ax_cr_sn_amp.set_title('base revised Signal range and Noise range Phase histogram')
+        ax_cr_sn_amp.set_xlabel('Phase [rad]')
+        ax_cr_sn_amp.set_ylabel('events/$\\mu s$')
+        ax_cr_sn_amp.grid(True, zorder=0)
+        sig_amp_n, sig_amp_bins, sig_amp_patches = ax_cr_sn_amp.hist(cr_signal_amp, bins=options['cr_sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']), zorder=5, label='signal', weights=signal_amp_weights, color='steelblue')
+        noise_amp_n, noise_amp_bins, noise_amp_patches = ax_cr_sn_amp.hist(cr_noise_amp, bins=options['cr_sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']), zorder=6, label='noise', alpha=0.5, weights=noise_amp_weights, color='orange')
+        sig_amp_n_bins = np.hstack((sig_amp_n.reshape(-1,1), sig_amp_bins[:-1].reshape(-1,1)))
+        noise_amp_n_bins = np.hstack((noise_amp_n.reshape(-1,1), noise_amp_bins[:-1].reshape(-1,1)))
+        amp_n_bins = np.hstack((sig_amp_n_bins, noise_amp_n_bins))
+        self.plt_obj.legend()
         
         # fig_stack_amp = self.plt_obj.figure('sn_amp_stack_hist')
         # ax_stack_amp = fig_stack_amp.add_subplot(111)
@@ -921,16 +942,16 @@ class Taudraw():
         sig_amp_sbt_weights = np.ones(len(signal_amp))/(2*len(signal_amp))
         noise_amp_sbt_weights = np.ones(len(noise_amp))/(2*len(signal_amp))*len(signal_amp)/len(noise_amp)
         
-        sig_amp_sbt_n, sig_amp_sbt_bins = np.histogram(signal_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']))
-        noise_amp_sbt_n, noise_amp_sbt_bins = np.histogram(noise_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']))
+        sig_amp_sbt_n, sig_amp_sbt_bins = np.histogram(cr_signal_amp, bins=options['sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']))
+        noise_amp_sbt_n, noise_amp_sbt_bins = np.histogram(cr_noise_amp, bins=options['sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']))
         
         sig_amp_sbt_n_bins = np.hstack((sig_amp_sbt_n.reshape(-1,1), sig_amp_sbt_bins[:-1].reshape(-1,1)))
         noise_amp_sbt_n_bins = np.hstack((noise_amp_sbt_n.reshape(-1,1), noise_amp_sbt_bins[:-1].reshape(-1,1)))
         amp_sbt_n_bins = np.hstack((sig_amp_sbt_n_bins, noise_amp_sbt_n_bins))
 
-        fig_sbt_amp = self.plt_obj.figure('sn_amp_subtract_hist')
+        fig_sbt_amp = self.plt_obj.figure('cr_sn_amp_subtract_hist')
         ax_sbt_amp = fig_sbt_amp.add_subplot(111)
-        ax_sbt_amp.set_title('Subtracted Phase histogram (Signal range - Noise range)')
+        ax_sbt_amp.set_title('Subtracted base revised Phase histogram (Signal range - Noise range)')
         ax_sbt_amp.set_xlabel('Phase [rad]')
         ax_sbt_amp.set_ylabel('$\\Delta$ events/$\\mu s$')
         ax_sbt_amp.set_xlim(options['sn_sbt_amp_min'], options['sn_sbt_amp_max'])

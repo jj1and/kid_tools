@@ -840,10 +840,18 @@ class Gaonep(Gao):
 class Gaotau(Gao):
     def __init__(self, ref_swp_fname, sg_freq=4000):
         self.trg_fname = "tod_trg.dat"
+        self.start_theta = 0.0
         self.lmfit_init_params = Parameters()
         self.lmfit_tau_result = minimizer.MinimizerResult()
 
         super().__init__(ref_swp_fname, sg_freq)
+    
+    def get_fr_phase(self):
+        tau, xc, yc, r, fr, Qr, phi_0 = self.get_fit_params()
+        fr_index = np.argmin(np.abs(self.f-fr))
+        xc_c_fr, yc_c_fr = self.set_data_default_position(self.I[fr_index], self.Q[fr_index], self.f[fr_index])
+        self.start_theta = np.arctan2(yc_c_fr, xc_c_fr)
+
 
     def tod2trg(self, trg_file_name, sample_rate, trg_freq, *fit_params, **kwargs):
         options={"load_fit_file":"none",
@@ -869,7 +877,7 @@ class Gaotau(Gao):
             else:
                 stop = trg_header_index[0][cnt+1]
             one_trg_time = time[start:stop]
-            one_trg_phase = self.phase_smoother(theta[start:stop])
+            one_trg_phase = self.phase_smoother(theta[start:stop], std_theta=self.start_theta)
             if(cnt==0):
                 one_trg = np.hstack((one_trg_time.reshape(-1,1), one_trg_phase.reshape(-1,1)))
                 trg_set = np.array([one_trg])
