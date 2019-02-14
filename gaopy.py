@@ -860,8 +860,10 @@ class Gaotau(Gao):
 
         trg_tod_data = np.genfromtxt(trg_file_name, delimiter=" ")
         time = trg_tod_data[:, 0]/(sample_rate*1000)
-        trg_tod_I = trg_tod_data[:, 1]*sample_rate
-        trg_tod_Q = trg_tod_data[:, 2]*sample_rate
+
+        scale_factor = sample_rate
+        trg_tod_I = trg_tod_data[:, 1]*scale_factor
+        trg_tod_Q = trg_tod_data[:, 2]*scale_factor
         xc_c, yc_c = self.set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
         theta = np.arctan2(yc_c, xc_c)
 

@@ -736,6 +736,10 @@ class Taudraw():
             pass
 
         trg_tod_data = np.genfromtxt(options['trg_fname'], delimiter=" ")
+            
+        scale_factor = spr
+        trg_tod_I = trg_tod_data[:, 1]*scale_factor
+        trg_tod_Q = trg_tod_data[:, 2]*scale_factor
         trg_tod_I = trg_tod_data[:, 1]*spr
         trg_tod_Q = trg_tod_data[:, 2]*spr
         xc_c, yc_c = self.gao_obj_dict[options['trg_fname']].set_data_default_position(trg_tod_I, trg_tod_Q, trg_freq)
