@@ -633,7 +633,7 @@ class Taudraw():
 
         plot_trgholder = self.trg_file_dict[options['trg_fname']]
         if(options['noise_plot']==True):
-            if((len(plot_trgholder.failed_list)==0)|(len(plot_trgholder.failed_list)>(options['trg_index']+1))):
+            if((len(plot_trgholder.failed_list)==0)|(len(plot_trgholder.failed_list)<=options['trg_index'])):
                 print("Selected noise waveform could not be found.")
                 print("plot first noise waveform")
                 cnt = 0
@@ -648,11 +648,11 @@ class Taudraw():
                 else:
                     print("No noise waveform was found.")
                     print("Cannot plot noise waveform")
-            elif(len(plot_trgholder.failed_list)>=(options['trg_index']+1)):
+            elif(len(plot_trgholder.failed_list)>options['trg_index']):
                 time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
 
         elif(options['noise_plot']==False):
-            if((len(plot_trgholder.oneshot_list)==0)|(len(plot_trgholder.oneshot_list)>(options['trg_index']+1))):
+            if((len(plot_trgholder.oneshot_list)==0)|(len(plot_trgholder.oneshot_list)<=options['trg_index'])):
                 print("Selected trgger waveform could not be found.")
                 print("plot first trigger waveform")
                 cnt = 0
@@ -670,7 +670,7 @@ class Taudraw():
                 else:
                     print("No trigger waveform was found.")
                     print("Cannot plot trigger waveform")
-            elif(len(plot_trgholder.oneshot_list)>=(options['trg_index']+1)):
+            elif(len(plot_trgholder.oneshot_list)>options['trg_index']):
                 time, phase = plot_trgholder.oneshot_list[options['trg_index']].output_data()
                 fit_time_min, fit_time_max = plot_trgholder.oneshot_list[options['trg_index']].time[plot_trgholder.oneshot_list[options['trg_index']].phase_fit_range]
                 fit_time = np.linspace(fit_time_min, fit_time_max)
