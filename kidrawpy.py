@@ -633,7 +633,7 @@ class Taudraw():
 
         plot_trgholder = self.trg_file_dict[options['trg_fname']]
         if(options['noise_plot']==True):
-            if((len(plot_trgholder.failed_list)==0)|(len(plot_trgholder.failed_list)<(options['trg_index']+1))):
+            if((len(plot_trgholder.failed_list)==0)|(len(plot_trgholder.failed_list)>(options['trg_index']+1))):
                 print("Selected noise waveform could not be found.")
                 print("plot first noise waveform")
                 cnt = 0
@@ -652,7 +652,7 @@ class Taudraw():
                 time, phase = plot_trgholder.failed_list[options['trg_index']].output_data()
 
         elif(options['noise_plot']==False):
-            if((len(plot_trgholder.oneshot_list)==0)|(len(plot_trgholder.oneshot_list)<(options['trg_index']+1))):
+            if((len(plot_trgholder.oneshot_list)==0)|(len(plot_trgholder.oneshot_list)>(options['trg_index']+1))):
                 print("Selected trgger waveform could not be found.")
                 print("plot first trigger waveform")
                 cnt = 0
