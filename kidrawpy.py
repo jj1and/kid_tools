@@ -427,6 +427,17 @@ class Taudraw():
         self.trg_file_dict = {}
         self.combined_df = pd.DataFrame([])
         self.failed_combined_df = pd.DataFrame([])
+        self.sig_tot = 0.0
+        self.nos_tot = 0.0
+        self.window_length = 100
+        self.data_length = 1024
+        self.sig_amp = np.array([])
+        self.nos_amp = np.array([])
+        self.sig_ohno_array = np.array([])
+        self.nos_ohno_array = np.array([])
+        # for ohno area analisys
+        self.sig_waste_tot = 0.0
+        self.nos_waste_tot = 0.0
 
     def set_save_dir(self, save_dir='./'):
         self.save_dir = save_dir
@@ -736,7 +747,7 @@ class Taudraw():
             pass
 
         trg_tod_data = np.genfromtxt(options['trg_fname'], delimiter=" ")
-            
+
         scale_factor = spr
         trg_tod_I = trg_tod_data[:, 1]*scale_factor
         trg_tod_Q = trg_tod_data[:, 2]*scale_factor
@@ -900,8 +911,8 @@ class Taudraw():
         svsr_cbar.set_label('events/hour')
         svsr_ymin, svsr_ymax = ax_svsr.get_ylim()
         svsr_xmin, svsr_xmax = ax_svsr.get_xlim()
-        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(svsr_ymin-1.0, svsr_ymax+1.0, 3), color='r', linestyle=':', label='thershold', zorder=10)
-        ax_svsr.plot(np.linspace(svsr_xmin-1.0, svsr_xmax+1.0, 3), self.std_ratio_ther*np.ones(3) ,color='r', linestyle=':', zorder=10)
+        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(self.std_ratio_ther, svsr_ymax+1.0, 3) ,color='r', linestyle=':', zorder=10, label='thershold')
+        ax_svsr.plot(np.linspace(self.fh_skew_ther, svsr_xmax+1.0, 3), self.std_ratio_ther*np.ones(3) ,color='r', linestyle=':', zorder=10)
         ax_svsr.set_ylim(svsr_ymin, svsr_ymax)
         ax_svsr.set_xlim(svsr_xmin, svsr_xmax)
         ax_svsr.legend()
@@ -968,133 +979,76 @@ class Taudraw():
                 self.plt_obj.tight_layout()
                 save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
 
-                
+    def tod_analyze(self, **kwargs):
+        a1_split_indices = np.arange(0, self.data_length, self.window_length)[1:]
+        a2_split_indices = np.arange(int(self.window_length/2), self.data_length, self.window_length)[1:]
+        for trgholder in self.trg_file_dict.values():
+            dt = 1/trgholder.sample_rate*1e-3
+            self.sig_tot += len(trgholder.oneshot_list)*self.data_length*dt
+            self.nos_tot += len(trgholder.failed_list)*self.data_length*dt
+            if(len(trgholder.oneshot_list)!=0):
+                for signal in trgholder.oneshot_list:
+                    tmp_base = np.mean(signal.phase[a2_split_indices[-1]:])
+                    self.sig_amp = np.append(self.sig_amp, signal.phase-tmp_base)
+                    sig_a1_range = np.split(signal.phase-tmp_base, a1_split_indices)
+                    sig_a2_range = np.split(signal.phase-tmp_base, a2_split_indices)
+                    self.sig_ohno_array = np.append(self.sig_ohno_array, np.array([np.sum(seg) for seg in sig_a1_range[:-1]])*dt)
+                    self.sig_ohno_array = np.append(self.sig_ohno_array, np.array([np.sum(seg) for seg in sig_a2_range[:-1]])*dt)
+                    self.sig_waste_tot += (len(sig_a1_range[-1])+len(sig_a2_range[-1]))*dt
+            if(len(trgholder.failed_list)!=0):
+                for noise in trgholder.failed_list:
+                    tmp_base = np.mean(noise.phase[a2_split_indices[-1]:])
+                    self.nos_amp = np.append(self.nos_amp, noise.phase-tmp_base)
+                    nos_a1_range = np.split(noise.phase-tmp_base, a1_split_indices)
+                    nos_a2_range = np.split(noise.phase-tmp_base, a2_split_indices)
+                    self.nos_ohno_array = np.append(self.nos_ohno_array, np.array([np.sum(seg) for seg in nos_a1_range[:-1]])*dt)
+                    self.nos_ohno_array = np.append(self.nos_ohno_array, np.array([np.sum(seg) for seg in nos_a2_range[:-1]])*dt)
+                    self.nos_waste_tot += (len(nos_a1_range[-1])+len(nos_a2_range[-1]))*dt
 
     def plot_tod_histogram(self, **kwargs):
-        failed_amp = np.array([])
-        noise_amp = np.array([])
-        signal_amp = np.array([])
-        cr_noise_amp = np.array([])
-        cr_signal_amp = np.array([])
-        noise_area = np.array([])
-        signal_area = np.array([])
-
-        for trgholder in self.trg_file_dict.values():
-            # for failed_shot in trgholder.failed_list:
-            #     tmp_failed = failed_shot.phase
-            #     failed_amp = np.append(failed_amp, tmp_failed)
-            for signal in trgholder.oneshot_list:
-                noise_amp = np.append(noise_amp, signal.phase[:signal.phase_fit_range[0]-1])
-                signal_amp = np.append(signal_amp, signal.phase[signal.phase_fit_range[0]-1:])
-                tmp_base = np.mean(signal.phase[:signal.phase_fit_range[0]-1])
-                cr_noise_amp = np.append(cr_noise_amp, signal.phase[:signal.phase_fit_range[0]-1]-tmp_base)
-                cr_signal_amp = np.append(cr_signal_amp, signal.phase[signal.phase_fit_range[0]-1:]-tmp_base)
-                signal_area = np.append(signal_area, np.sum(signal.phase[signal.phase_fit_range[0]-1:]))
-                noise_area = np.append(noise_area, np.sum(signal.phase[:signal.phase_fit_range[0]-1])*len(signal.time[signal.phase_fit_range[0]-1:])/len(signal.time[:signal.phase_fit_range[0]-1]))
-
         options = {'save':False,
-        'sn_amp_bins':int(round(np.log2(len(signal_amp))+1)),
-        'sn_amp_min':signal_amp.min(),
-        'sn_amp_max':signal_amp.max(),
-        'sn_area_bins':int(round(np.log2(len(signal_area))+1)),
-        'sn_area_min':signal_area.min(),
-        'sn_area_max':signal_area.max(),
-        'cr_sn_amp_bins':int(round(np.log2(len(cr_signal_amp))+1)),
-        'cr_sn_amp_min':cr_signal_amp.min(),
-        'cr_sn_amp_max':cr_signal_amp.max(),
-        'sn_sbt_amp_min':cr_signal_amp.min(),
-        'sn_sbt_amp_max':cr_signal_amp.max(),
+        'sn_amp_bins':int(round(np.log2(len(self.sig_amp)+len(self.nos_amp))+1)),
+        'sn_amp_min':self.sig_amp.min(),
+        'sn_amp_max':self.sig_amp.max(),
+        'ohno_area_bins':int(round(np.log2(len(self.sig_ohno_array)+len(self.nos_ohno_array))+1)),
+        'ohno_area_min':self.sig_ohno_array.min()*1e6,
+        'ohno_area_max':self.sig_ohno_array.max()*1e6,
         'cut':[0]}
         options.update(kwargs)
 
-        signal_amp_weights = np.ones(len(signal_amp))/len(signal_amp)
-        noise_amp_weights = np.ones(len(noise_amp))/len(noise_amp)
+        sig_amp_w = np.ones(len(self.sig_amp))/self.sig_tot
+        nos_amp_w = np.ones(len(self.nos_amp))/self.nos_tot
+        sig_ohno_w = np.ones(len(self.sig_ohno_array))/(self.sig_tot-self.sig_waste_tot)
+        nos_ohno_w = np.ones(len(self.nos_ohno_array))/(self.nos_tot-self.nos_waste_tot)
         
-        fig_sn_amp = self.plt_obj.figure('sig_amp_hist')
+        fig_sn_amp = self.plt_obj.figure('sn_amp_hist')
         ax_sn_amp = fig_sn_amp.add_subplot(111)
-        ax_sn_amp.set_title('Signal range and Noise range Phase histogram')
+        ax_sn_amp.set_title('signal and noise phase shift histgram (base subtructed)')
         ax_sn_amp.set_xlabel('Phase [rad]')
         ax_sn_amp.set_ylabel('events/$\\mu s$')
+        ax_sn_amp.set_yscale('log')
         ax_sn_amp.grid(True, zorder=0)
-        sig_amp_n, sig_amp_bins, sig_amp_patches = ax_sn_amp.hist(signal_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=5, label='signal', weights=signal_amp_weights, color='steelblue')
-        noise_amp_n, noise_amp_bins, noise_amp_patches = ax_sn_amp.hist(noise_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=6, label='noise', alpha=0.5, weights=noise_amp_weights, color='orange')
+        sig_amp_n, sig_amp_bins, sig_amp_patches = ax_sn_amp.hist(self.sig_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=5, label='signal', weights=sig_amp_w, color='steelblue', histtype='step')
+        nos_amp_n, nos_amp_bins, nos_amp_patches = ax_sn_amp.hist(self.nos_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=6, label='noise', weights=nos_amp_w, color='orange', histtype='step')
         sig_amp_n_bins = np.hstack((sig_amp_n.reshape(-1,1), sig_amp_bins[:-1].reshape(-1,1)))
-        noise_amp_n_bins = np.hstack((noise_amp_n.reshape(-1,1), noise_amp_bins[:-1].reshape(-1,1)))
-        amp_n_bins = np.hstack((sig_amp_n_bins, noise_amp_n_bins))
+        nos_amp_n_bins = np.hstack((nos_amp_n.reshape(-1,1), nos_amp_bins[:-1].reshape(-1,1)))
+        amp_n_bins = np.hstack((sig_amp_n_bins, nos_amp_n_bins))
         self.plt_obj.legend()
 
-
-        fig_cr_sn_amp = self.plt_obj.figure('cr_sig_amp_hist')
-        ax_cr_sn_amp = fig_cr_sn_amp.add_subplot(111)
-        ax_cr_sn_amp.set_title('base revised Signal range and Noise range Phase histogram')
-        ax_cr_sn_amp.set_xlabel('Phase [rad]')
-        ax_cr_sn_amp.set_ylabel('events/$\\mu s$')
-        ax_cr_sn_amp.grid(True, zorder=0)
-        sig_amp_n, sig_amp_bins, sig_amp_patches = ax_cr_sn_amp.hist(cr_signal_amp, bins=options['cr_sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']), zorder=5, label='signal', weights=signal_amp_weights, color='steelblue')
-        noise_amp_n, noise_amp_bins, noise_amp_patches = ax_cr_sn_amp.hist(cr_noise_amp, bins=options['cr_sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']), zorder=6, label='noise', alpha=0.5, weights=noise_amp_weights, color='orange')
-        sig_amp_n_bins = np.hstack((sig_amp_n.reshape(-1,1), sig_amp_bins[:-1].reshape(-1,1)))
-        noise_amp_n_bins = np.hstack((noise_amp_n.reshape(-1,1), noise_amp_bins[:-1].reshape(-1,1)))
-        amp_n_bins = np.hstack((sig_amp_n_bins, noise_amp_n_bins))
+        fig_sum_area = self.plt_obj.figure('sum_area_hist')
+        ax_sum_area = fig_sum_area.add_subplot(111)
+        ax_sum_area.set_title('ohno\'s area (sum window length: 100$\\mu$s) stacked histogram')
+        ax_sum_area.set_xlabel('area [rad $\\cdot \\mu$s]')
+        ax_sum_area.set_ylabel('events/100s')
+        ax_sum_area.set_yscale('log')
+        ax_sum_area.grid(True, zorder=0)
+        ohno_n, ohno_bins, ohno_patches = ax_sum_area.hist((self.nos_ohno_array*1e6, self.sig_ohno_array*1e6), bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=(nos_ohno_w*100, sig_ohno_w*100), histtype='barstacked',  color=('orange', 'steelblue'), label=('noise', 'signal'))
         self.plt_obj.legend()
         
-        # fig_stack_amp = self.plt_obj.figure('sn_amp_stack_hist')
-        # ax_stack_amp = fig_stack_amp.add_subplot(111)
-        # ax_stack_amp.set_title('Signal and Noise Amp. histogram (stacked)')
-        # ax_stack_amp.set_xlabel('Amp. [rad]')
-        # ax_stack_amp.set_ylabel('events/all events')
-        # ax_stack_amp.grid(True, zorder=0)
-        # ax_stack_amp.hist((noise_amp, signal_amp), bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), weights=(noise_amp_weights, signal_amp_weights), np.ones(len(signal_amp))/(len(signal_amp)+len(noise_amp))), histtype='barstacked', zorder=5, label=('noise', 'signal'), color=('orange', 'steelblue'))
-        # self.plt_obj.legend()
-
-        sig_amp_sbt_weights = np.ones(len(signal_amp))/(2*len(signal_amp))
-        noise_amp_sbt_weights = np.ones(len(noise_amp))/(2*len(signal_amp))*len(signal_amp)/len(noise_amp)
-        
-        sig_amp_sbt_n, sig_amp_sbt_bins = np.histogram(cr_signal_amp, bins=options['sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']))
-        noise_amp_sbt_n, noise_amp_sbt_bins = np.histogram(cr_noise_amp, bins=options['sn_amp_bins'], range=(options['cr_sn_amp_min'], options['cr_sn_amp_max']))
-        
-        sig_amp_sbt_n_bins = np.hstack((sig_amp_sbt_n.reshape(-1,1), sig_amp_sbt_bins[:-1].reshape(-1,1)))
-        noise_amp_sbt_n_bins = np.hstack((noise_amp_sbt_n.reshape(-1,1), noise_amp_sbt_bins[:-1].reshape(-1,1)))
-        amp_sbt_n_bins = np.hstack((sig_amp_sbt_n_bins, noise_amp_sbt_n_bins))
-
-        fig_sbt_amp = self.plt_obj.figure('cr_sn_amp_subtract_hist')
-        ax_sbt_amp = fig_sbt_amp.add_subplot(111)
-        ax_sbt_amp.set_title('Subtracted base revised Phase histogram (Signal range - Noise range)')
-        ax_sbt_amp.set_xlabel('Phase [rad]')
-        ax_sbt_amp.set_ylabel('$\\Delta$ events/$\\mu s$')
-        ax_sbt_amp.set_xlim(options['sn_sbt_amp_min'], options['sn_sbt_amp_max'])
-        ax_sbt_amp.grid(True, zorder=0)
-        ax_sbt_amp.bar(sig_amp_sbt_bins[:-1], sig_amp_sbt_n/len(signal_amp)-noise_amp_sbt_n/len(noise_amp), width=(sig_amp_sbt_bins[-1]-sig_amp_sbt_bins[-2]), label='subtract', color='forestgreen', zorder=5)
-        #ax_sbt_amp.bar(sig_amp_sbt_bins[:-1], sig_amp_sbt_n/len(signal_amp), width=(sig_amp_sbt_bins[-1]-sig_amp_sbt_bins[-2]), label='signal range', color='steelblue', zorder=3)
-        #ax_sbt_amp.bar(sig_amp_sbt_bins[:-1], noise_amp_sbt_n/len(noise_amp), width=(sig_amp_sbt_bins[-1]-sig_amp_sbt_bins[-2]), label='noise range', color='orange', zorder=4)
-        self.plt_obj.legend()
-
-        # signal_area_weights = np.ones(len(signal_area))/len(signal_area)
-        # noise_area_weights = np.ones(len(noise_area))/len(noise_area)
-
-        # fig_sn_area = self.plt_obj.figure('sig_area_hist')
-        # ax_sn_area = fig_sn_area.add_subplot(111)
-        # ax_sn_area.set_title('Signal and Noise area histogram')
-        # ax_sn_area.set_xlabel('area/one signal [rad $\\cdot \\mu$s]')
-        # ax_sn_area.set_ylabel('rate')
-        # ax_sn_area.grid(True, zorder=0)
-        # sig_area_n, sig_area_bins, sig_area_patches = ax_sn_area.hist(signal_area, bins=options['sn_area_bins'], range=(options['sn_area_min'], options['sn_area_max']), zorder=5, label='signal', weights=signal_area_weights, color='steelblue')
-        # noise_area_n, noise_area_bins, noise_area_patches = ax_sn_area.hist(noise_area, bins=options['sn_area_bins'], range=(options['sn_area_min'], options['sn_area_max']), zorder=6, label='noise', alpha=0.5, weights=noise_area_weights, color='orange')
-        # self.plt_obj.legend()
-        
-        # fig_stack_area = self.plt_obj.figure('sn_area_stack_hist')
-        # ax_stack_area = fig_stack_area.add_subplot(111)
-        # ax_stack_area.set_title('Signal and Noise area histogram (stacked)')
-        # ax_stack_area.set_xlabel('area/one signal [rad $\\cdot \\mu$s]')
-        # ax_stack_area.set_ylabel('rate')
-        # ax_stack_area.grid(True, zorder=0)
-        # ax_stack_area.hist((noise_area, signal_area), bins=options['sn_area_bins'], range=(options['sn_area_min'], options['sn_area_max']), weights=(np.ones(len(noise_area))/(len(signal_area)+len(noise_area)), np.ones(len(signal_area))/(len(signal_area)+len(noise_area))), histtype='barstacked', zorder=5, label=('noise', 'signal'), color=('orange', 'steelblue'))
-        # self.plt_obj.legend()
-
         if(options['save']==True):
             for fig_lb in self.plt_obj.get_figlabels():
                 save_fig = self.plt_obj.figure(fig_lb)
                 self.plt_obj.tight_layout()
                 save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
             np.savetxt(self.save_dir + 'tod_amp_hist.dat', amp_n_bins, delimiter=' ', header='signal_n signal_bins noise_n noise_bins')
-            np.savetxt(self.save_dir + 'tod_amp_sbt_hist.dat', amp_sbt_n_bins, delimiter=' ', header='signal_n signal_bins noise_n noise_bins')
 
