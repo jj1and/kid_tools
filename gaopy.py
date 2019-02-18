@@ -92,20 +92,31 @@ class Gao():
                 csv_rows = [csv_header]
                 var_names = self.lmfit_result.var_names
                 val_dict = self.lmfit_result.params.valuesdict()
-                sig = np.sqrt(np.diag(self.lmfit_result.covar))
+                if(self.lmfit_result.errorbars==True):
+                    sig = np.sqrt(np.diag(self.lmfit_result.covar))
+                elif(self.lmfit_result.errorbars==False):
+                    print("failed to estimate error")
                 init_vals =  self.lmfit_result.init_vals
                 cnt = 0
                 for key in val_dict.keys():
-                    if(key=='qi'):
-                        dqi_dqc_2 = (val_dict['qr']/(val_dict['qc']-val_dict['qr']))**4
-                        dqi_dqr_2 = (val_dict['qc']/(val_dict['qc']-val_dict['qr']))**4
-                        sig_qc = sig[var_names.index('qc')]
-                        sig_qr = sig[var_names.index('qr')]
-                        sig_qi = np.sqrt(dqi_dqc_2*sig_qc**2 + dqi_dqr_2*sig_qr**2)
-                        tmp_row = [key, str(val_dict[key]), str(sig_qi), 'None']
-                    else:
-                        tmp_row = [key, str(val_dict[key]), str(sig[cnt]), str(init_vals[cnt])]
-                        cnt += 1
+                    if(self.lmfit_result.errorbars==True):
+                        if(key=='qi'):
+                            dqi_dqc_2 = (val_dict['qr']/(val_dict['qc']-val_dict['qr']))**4
+                            dqi_dqr_2 = (val_dict['qc']/(val_dict['qc']-val_dict['qr']))**4
+                            sig_qc = sig[var_names.index('qc')]
+                            sig_qr = sig[var_names.index('qr')]
+                            sig_qi = np.sqrt(dqi_dqc_2*sig_qc**2 + dqi_dqr_2*sig_qr**2)
+                            tmp_row = [key, str(val_dict[key]), str(sig_qi), 'None']
+                        else:
+                            tmp_row = [key, str(val_dict[key]), str(sig[cnt]), str(init_vals[cnt])]
+                            cnt += 1
+
+                    elif(self.lmfit_result.errorbars==False):
+                        if(key=='qi'):
+                            tmp_row = [key, str(val_dict[key]), 'None', 'None']
+                        else:
+                            tmp_row = [key, str(val_dict[key]), 'None', str(init_vals[cnt])]
+                            cnt += 1
                     csv_rows.append(tmp_row)
                 writer = csv.writer(f)
                 for row in csv_rows:
@@ -201,6 +212,8 @@ class Gao():
         options = {'std_theta':theta[0]}
         options.update(kwargs)
         mod_theta = deepcopy(theta - options['std_theta'])
+        delta_min_idx = deepcopy(np.argmin(np.abs(mod_theta)))
+        delta_min = deepcopy(mod_theta[delta_min_idx])
         diff_theta =  np.diff(mod_theta)
         ther = 0.5
         #smp_len = 10
@@ -219,6 +232,23 @@ class Gao():
             elif(diff_theta[jumped_index]<0):
                 mod_theta[jumped_index+1:] += 2*np.pi
             jump_cnt += 1
+
+        if(mod_theta[delta_min_idx]<delta_min):
+            cnt = 0
+            while(mod_theta[delta_min_idx]<delta_min):
+                mod_theta += 2*np.pi
+                cnt += 1
+                if(cnt>1000):
+                    print('stacked!!')
+                    break
+        if(mod_theta[delta_min_idx]>delta_min):
+            cnt = 0
+            while(mod_theta[delta_min_idx]>delta_min):
+                mod_theta -= 2*np.pi
+                cnt += 1
+                if(cnt>1000):
+                    print('stacked!!')
+                    break
         #print("theta_jump: " + str(jump_cnt)+ " times found")
 
         # diff_max_index = np.argmax(diff_theta)
@@ -697,12 +727,19 @@ class Gaonep(Gao):
         for ele in self.oncho_file_list:
             fname = ele[0]
             temp = ele[1]
-            swp_data = np.genfromtxt(fname, delimiter=" ")
-            tmp_I = swp_data[:,1]
-            tmp_Q = swp_data[:,2]
-            tmp_f = self.sg*1.0E6 + swp_data[:,0]
-            tmp_fr_idx = np.abs(tmp_f-fr).argmin()
-            tmp_xc_c, tmp_yc_c = self.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+            # swp_data = np.genfromtxt(fname, delimiter=" ")
+            # tmp_I = swp_data[:,1]
+            # tmp_Q = swp_data[:,2]
+            # tmp_f = self.sg*1.0E6 + swp_data[:,0]
+            # tmp_fr_idx = np.abs(tmp_f-fr).argmin()
+            # tmp_xc_c, tmp_yc_c = self.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+
+            tmp_gao = Gaonep(fname, 5300)
+            tmp_gao.coarse_fit()
+            tmp_gao.fine_fit()
+            tmp_fr_idx = np.abs(tmp_gao.f-fr).argmin()
+            tmp_xc_c, tmp_yc_c = tmp_gao.set_data_default_position(tmp_gao.I, tmp_gao.Q, tmp_gao.f)
+
             tmp_theta = np.arctan2(tmp_yc_c, tmp_xc_c)
             if(cnt==0):
                 std_theta = tmp_theta[tmp_fr_idx]

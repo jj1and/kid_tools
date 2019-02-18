@@ -288,13 +288,20 @@ class Nepdraw(Kidraw):
         Tmax = np.max(Tarray).reshape((1,-1))[0][0]
 
         for fname in fname_list:
-            swp_data = np.genfromtxt(fname, delimiter=" ")
-            tmp_I = swp_data[:,1]
-            tmp_Q = swp_data[:,2]
+            # swp_data = np.genfromtxt(fname, delimiter=" ")
+            # tmp_I = swp_data[:,1]
+            # tmp_Q = swp_data[:,2]
 
-            tmp_f = self.gao_obj.sg*1.0E6 + swp_data[:,0]
-            tmp_fr_idx = np.abs(tmp_f-self.fr).argmin()
-            oncho_xc_c, oncho_yc_c = self.gao_obj.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+            # tmp_f = self.gao_obj.sg*1.0E6 + swp_data[:,0]
+            # tmp_fr_idx = np.abs(tmp_f-self.fr).argmin()
+            # oncho_xc_c, oncho_yc_c = self.gao_obj.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+
+            tmp_gao = gaopy.Gaonep(fname, 5300)
+            tmp_gao.coarse_fit(**kwargs)
+            tmp_gao.fine_fit(**kwargs)
+            tmp_fr_idx = np.abs(tmp_gao.f-self.fr).argmin()
+            oncho_xc_c, oncho_yc_c = tmp_gao.set_data_default_position(tmp_gao.I, tmp_gao.Q, tmp_gao.f)
+
             segments.append(list(zip(oncho_xc_c, oncho_yc_c)))
 
             if(cnt==0):
@@ -534,7 +541,7 @@ class Taudraw():
         phase = np.arctan2(plot_Q, plot_I)
         smooth_phase = self.gao_obj_dict[options['trg_fname']].phase_smoother(phase)
 
-        fig_IQ = self.plt_obj.figure('IQ')
+        fig_IQ = self.plt_obj.figure('IQ', figsize=(10,10))
         ax_IQ = fig_IQ.add_subplot(111)
         ax_IQ.tick_params(direction='in')
         ax_IQ.grid(True)
@@ -546,7 +553,7 @@ class Taudraw():
         ax_IQ.scatter(x, y, label="I/Q (removed tau)", color='b')
         ax_IQ.scatter(xc_c, yc_c, label="I/Q (centerd)", color='g')
         ax_IQ.scatter(plot_xc, plot_yc, label='circle center', color='k')
-        ax_IQ.scatter(xc_c[fr_index], yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^')
+        ax_IQ.scatter(xc_c[fr_index], yc_c[fr_index], label='fr', color='w', edgecolors='k', marker='^', zorder=10)
 
         if(plot_fine_fit_success==True):
             fit_f = np.linspace(self.gao_obj_dict[options['trg_fname']].fine_fit_range[0], self.gao_obj_dict[options['trg_fname']].fine_fit_range[1], 100)
@@ -626,6 +633,7 @@ class Taudraw():
         options.update(kwargs)
         trg_fig = self.plt_obj.figure('one_trg', clear=True)
         trg_ax = trg_fig.add_subplot(111)
+        trg_ax.tick_params(direction='in')
         trg_ax.set_title('one trigger waveform')
         trg_ax.set_xlabel('time [$\\mu s$]')
         trg_ax.set_ylabel('phase [rad]')
@@ -812,6 +820,20 @@ class Taudraw():
         ax_tau.grid(True, zorder=0)
         tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5, color='steelblue', weights=tot_weights)
         tau_n_bins = np.hstack((tau_n.reshape(-1,1), tau_bins[:-1].reshape(-1,1)))
+        tau_entries = len(cut_df['phase_tau'].index)
+        tau_mean = np.mean(cut_df['phase_tau'])
+        tau_sig = np.std(cut_df['phase_tau'])
+        rows = ['Entries', 'mean', 'std']
+        tau_data = [['{0:d}/{1:.1f} hour'.format(tau_entries, self.tot_h)], ['{0:.2f} $\\mu$s'.format(tau_mean*1e6)], ['{0:.2f} $\\mu$s'.format(tau_sig*1e6)]]
+        self.plt_obj.table(
+            cellText=tau_data,
+            cellLoc='center',
+            colWidths=[0.3],
+            rowLabels=rows,
+            rowLoc='center',
+            loc='upper right',
+            zorder=10
+        )
         # tau_bin_width = tau_bins[-1]-tau_bins[-2]
         # tau_x = tau_bins[:-1]+tau_bin_width/2
         # lognom_mod = LognormalModel()
@@ -835,6 +857,20 @@ class Taudraw():
         ax_amp.grid(True, zorder=0)
         amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5, color='crimson', weights=tot_weights)
         amp_n_bins = np.hstack((amp_n.reshape(-1,1), amp_bins[:-1].reshape(-1,1)))
+        amp_entries = len(cut_df['phase_Amp'].index)
+        amp_mean = np.mean(cut_df['phase_Amp'])
+        amp_sig = np.std(cut_df['phase_Amp'])
+        rows = ['Entries', 'mean', 'std']
+        amp_data = [['{0:d}/{1:.1f} hour'.format(amp_entries, self.tot_h)], ['{0:.2f} rad'.format(amp_mean)], ['{0:.2f} rad'.format(amp_sig)]]
+        self.plt_obj.table(
+            cellText=amp_data,
+            cellLoc='center',
+            colWidths=[0.3],
+            rowLabels=rows,
+            rowLoc='center',
+            loc='upper right',
+            zorder=10
+        )
 
         fig_area = self.plt_obj.figure('area_hist')
         ax_area = fig_area.add_subplot(111)
@@ -844,6 +880,20 @@ class Taudraw():
         ax_area.grid(True, zorder=0)
         area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5, color='green', weights=tot_weights)
         area_n_bins = np.hstack((area_n.reshape(-1,1), area_bins[:-1].reshape(-1,1)))
+        area_entries = len(cut_df['phase_area'].index)
+        area_mean = np.mean(cut_df['phase_area'])
+        area_sig = np.std(cut_df['phase_area'])
+        rows = ['Entries', 'mean', 'std']
+        area_data = [['{0:d}/{1:.1f} hour'.format(area_entries, self.tot_h)], ['{0:.2f} rad$\\cdot\\mu$s'.format(area_mean*1e6)], ['{0:.2f} rad$\\cdot\\mu$s'.format(area_sig*1e6)]]
+        self.plt_obj.table(
+            cellText=area_data,
+            cellLoc='center',
+            colWidths=[0.3],
+            rowLabels=rows,
+            rowLoc='center',
+            loc='upper right',
+            zorder=10
+        )
 
         fig_tvsAmp = self.plt_obj.figure('tvsAmp_hist')
         ax_tvsAmp = fig_tvsAmp.add_subplot(111)
@@ -853,7 +903,7 @@ class Taudraw():
         ax_tvsAmp.grid(True, zorder=0)
         tvsAmp_h, tau_tvsAmp_xedges, tau_tvsAmp_yedges, tvsAmp_im = ax_tvsAmp.hist2d(cut_df['phase_tau']*1e6, cut_df['phase_Amp'], bins=options['avt_bins'], range=[options['avt_tau_min_max'], options['avt_amp_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         tvsAmp_im.cmap.set_under('w')
-        tvsAmp_cbar = self.plt_obj.colorbar(tvsAmp_im, ax=ax_tvsAmp, extend='min')
+        tvsAmp_cbar = self.plt_obj.colorbar(tvsAmp_im, ax=ax_tvsAmp)
         tvsAmp_cbar.set_label('events/hour')
 
 
@@ -861,7 +911,7 @@ class Taudraw():
             for fig_lb in self.plt_obj.get_figlabels():
                 save_fig = self.plt_obj.figure(fig_lb)
                 self.plt_obj.tight_layout()
-                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200, figsize=(10,10))
             np.savetxt(self.save_dir+'amp_hist.dat', amp_n_bins, delimiter=' ', header='n bins')
             np.savetxt(self.save_dir+'tau_hist.dat', tau_n_bins, delimiter=' ', header='n bins')
             np.savetxt(self.save_dir+'area_hist.dat', area_n_bins, delimiter=' ', header='n bins')
@@ -871,11 +921,28 @@ class Taudraw():
         options = {
         'cut':[0]
         }
+
         if(len(options['cut'])==1):
             cut_df = pd.concat([self.combined_df, self.failed_combined_df], axis=0, sort=False)
         elif(len(options['cut'])!=1):
             cut_df = pd.concat([self.combined_df[options['cut']], self.failed_combined_df], axis=0, sort=False)
 
+        out_ther_entries = len(cut_df[(cut_df['fh_skew']>self.fh_skew_ther)&(cut_df['std_ratio']>self.std_ratio_ther)].index)
+        out_ther_skew_mean = np.mean(cut_df[(cut_df['fh_skew']>self.fh_skew_ther)&(cut_df['std_ratio']>self.std_ratio_ther)]['fh_skew'])
+        out_ther_skew_std = np.std(cut_df[(cut_df['fh_skew']>self.fh_skew_ther)&(cut_df['std_ratio']>self.std_ratio_ther)]['fh_skew'])
+        out_ther_sr_mean = np.mean(cut_df[(cut_df['fh_skew']>self.fh_skew_ther)&(cut_df['std_ratio']>self.std_ratio_ther)]['std_ratio'])
+        out_ther_sr_std = np.std(cut_df[(cut_df['fh_skew']>self.fh_skew_ther)&(cut_df['std_ratio']>self.std_ratio_ther)]['std_ratio'])
+        in_ther_entries = len(cut_df[(cut_df['fh_skew']<=self.fh_skew_ther)|(cut_df['std_ratio']<=self.std_ratio_ther)].index)
+        in_ther_skew_mean = np.mean(cut_df[(cut_df['fh_skew']<=self.fh_skew_ther)|(cut_df['std_ratio']<=self.std_ratio_ther)]['fh_skew'])
+        in_ther_skew_std = np.std(cut_df[(cut_df['fh_skew']<=self.fh_skew_ther)|(cut_df['std_ratio']<=self.std_ratio_ther)]['fh_skew'])
+        in_ther_sr_mean = np.mean(cut_df[(cut_df['fh_skew']<=self.fh_skew_ther)|(cut_df['std_ratio']<=self.std_ratio_ther)]['std_ratio'])
+        in_ther_sr_std = np.std(cut_df[(cut_df['fh_skew']<=self.fh_skew_ther)|(cut_df['std_ratio']<=self.std_ratio_ther)]['std_ratio'])
+        
+        columns = ['skewness(inner)', 'std ratio(inner)', 'skewness(outer)', 'std ratio(outer)']
+        rows = ['mean', 'std']
+        stats_data = [['{0:.2f}'.format(in_ther_skew_mean), '{0:.3f}'.format(in_ther_sr_mean), '{0:.3f}'.format(out_ther_skew_mean), '{0:.3f}'.format(out_ther_sr_mean)], ['{0:.3f}'.format(in_ther_skew_std), '{0:.3f}'.format(in_ther_sr_std), '{0:.3f}'.format(out_ther_skew_std), '{0:.3f}'.format(out_ther_sr_std)]]
+
+        
         options2 = {
         'save':False,
         'svsr_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
@@ -899,7 +966,6 @@ class Taudraw():
 
         tot_weights = np.ones(len(cut_df['fh_skew']))/self.tot_h
 
-
         fig_svsr = self.plt_obj.figure('svsr_hist')
         ax_svsr = fig_svsr.add_subplot(111)
         ax_svsr.set_title('first half skew vs std_ratio histogram')
@@ -911,11 +977,33 @@ class Taudraw():
         svsr_cbar.set_label('events/hour')
         svsr_ymin, svsr_ymax = ax_svsr.get_ylim()
         svsr_xmin, svsr_xmax = ax_svsr.get_xlim()
-        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(self.std_ratio_ther, svsr_ymax+1.0, 3) ,color='r', linestyle=':', zorder=10, label='thershold')
+        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(self.std_ratio_ther, svsr_ymax+1.0, 3) ,color='r', linestyle=':', zorder=10, label='threshold')
         ax_svsr.plot(np.linspace(self.fh_skew_ther, svsr_xmax+1.0, 3), self.std_ratio_ther*np.ones(3) ,color='r', linestyle=':', zorder=10)
         ax_svsr.set_ylim(svsr_ymin, svsr_ymax)
         ax_svsr.set_xlim(svsr_xmin, svsr_xmax)
-        ax_svsr.legend()
+        self.plt_obj.table(
+            cellText=stats_data,
+            cellLoc='center',
+            colWidths=[0.3, 0.3, 0.3, 0.3],
+            colLabels=columns,
+            rowLabels=rows,
+            rowLoc='center',
+            loc='bottom', 
+            bbox=[0.0,-0.35, 1.0, 0.18],
+            zorder=10
+        )
+        self.plt_obj.tight_layout()
+        # self.plt_obj.table(
+        #     cellText=in_data,
+        #     cellLoc='center',
+        #     colWidths=[0.3, 0.3],
+        #     colLabels=columns,
+        #     rowLabels=rows,
+        #     rowLoc='center',
+        #     loc='lower right',
+        #     zorder=10
+        # )
+        ax_svsr.legend(loc='upper left')
 
         fig_svt = self.plt_obj.figure('svt_hist')
         ax_svt = fig_svt.add_subplot(111)
@@ -927,7 +1015,7 @@ class Taudraw():
         svt_cbar = self.plt_obj.colorbar(svt_im, ax=ax_svt)
         svt_cbar.set_label('events/hour')
         svt_ymin, svt_ymax = ax_svt.get_ylim()
-        ax_svt.plot(self.fh_skew_ther*np.ones(3), np.linspace(svt_ymin-1.0, svt_ymax+1.0, 3), color='r', linestyle=':', label='skew thershold', zorder=6)
+        ax_svt.plot(self.fh_skew_ther*np.ones(3), np.linspace(svt_ymin-1.0, svt_ymax+1.0, 3), color='r', linestyle=':', label='skew threshold', zorder=6)
         ax_svt.set_ylim(svt_ymin, svt_ymax)
         ax_svt.legend()
 
@@ -941,7 +1029,7 @@ class Taudraw():
         srvt_cbar = self.plt_obj.colorbar(srvt_im, ax=ax_srvt)
         srvt_cbar.set_label('events/hour')
         srvt_ymin, srvt_ymax = ax_srvt.get_ylim()
-        ax_srvt.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvt_ymin-1.0, srvt_ymax+1.0, 3), color='r', linestyle=':', label='std ratio thershold', zorder=6)
+        ax_srvt.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvt_ymin-1.0, srvt_ymax+1.0, 3), color='r', linestyle=':', label='std ratio threshold', zorder=6)
         ax_srvt.set_ylim(srvt_ymin, srvt_ymax)
         ax_srvt.legend()
 
@@ -955,7 +1043,7 @@ class Taudraw():
         svA_cbar = self.plt_obj.colorbar(svA_im, ax=ax_svA)
         svA_cbar.set_label('events/hour')
         svA_ymin, svA_ymax = ax_svA.get_ylim()
-        ax_svA.plot(self.fh_skew_ther*np.ones(3), np.linspace(svA_ymin-1.0, svA_ymax+1.0, 3), color='r', linestyle=':', label='skew thershold', zorder=6)
+        ax_svA.plot(self.fh_skew_ther*np.ones(3), np.linspace(svA_ymin-1.0, svA_ymax+1.0, 3), color='r', linestyle=':', label='skew threshold', zorder=6)
         ax_svA.set_ylim(svA_ymin, svA_ymax)
         ax_svA.legend()
 
@@ -969,7 +1057,7 @@ class Taudraw():
         srvA_cbar = self.plt_obj.colorbar(srvA_im, ax=ax_srvA)
         srvA_cbar.set_label('events/hour')
         srvA_ymin, srvA_ymax = ax_srvA.get_ylim()
-        ax_srvA.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvA_ymin-1.0, srvA_ymax+1.0, 3), color='r', linestyle=':', label='std ratio thershold', zorder=6)
+        ax_srvA.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvA_ymin-1.0, srvA_ymax+1.0, 3), color='r', linestyle=':', label='std ratio threshold', zorder=6)
         ax_srvA.set_ylim(srvA_ymin, srvA_ymax)
         ax_srvA.legend()
 
@@ -980,30 +1068,31 @@ class Taudraw():
                 save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
 
     def tod_analyze(self, **kwargs):
+        header_length=100
         a1_split_indices = np.arange(0, self.data_length, self.window_length)[1:]
         a2_split_indices = np.arange(int(self.window_length/2), self.data_length, self.window_length)[1:]
         for trgholder in self.trg_file_dict.values():
-            dt = 1/trgholder.sample_rate*1e-3
+            dt = 1.0/(trgholder.sample_rate*1e3)
             self.sig_tot += len(trgholder.oneshot_list)*self.data_length*dt
             self.nos_tot += len(trgholder.failed_list)*self.data_length*dt
             if(len(trgholder.oneshot_list)!=0):
                 for signal in trgholder.oneshot_list:
-                    tmp_base = np.mean(signal.phase[a2_split_indices[-1]:])
+                    tmp_base = np.mean(signal.phase[:header_length])
                     self.sig_amp = np.append(self.sig_amp, signal.phase-tmp_base)
                     sig_a1_range = np.split(signal.phase-tmp_base, a1_split_indices)
                     sig_a2_range = np.split(signal.phase-tmp_base, a2_split_indices)
-                    self.sig_ohno_array = np.append(self.sig_ohno_array, np.array([np.sum(seg) for seg in sig_a1_range[:-1]])*dt)
-                    self.sig_ohno_array = np.append(self.sig_ohno_array, np.array([np.sum(seg) for seg in sig_a2_range[:-1]])*dt)
-                    self.sig_waste_tot += (len(sig_a1_range[-1])+len(sig_a2_range[-1]))*dt
+                    self.sig_ohno_array = np.append(self.sig_ohno_array, np.array([np.sum(seg) for seg in sig_a1_range[2:-1]])*dt)
+                    self.sig_ohno_array = np.append(self.sig_ohno_array, np.array([np.sum(seg) for seg in sig_a2_range[2:-1]])*dt)
+                    self.sig_waste_tot += (len(sig_a1_range[1]) + len(sig_a1_range[-1]))*dt
             if(len(trgholder.failed_list)!=0):
                 for noise in trgholder.failed_list:
-                    tmp_base = np.mean(noise.phase[a2_split_indices[-1]:])
+                    tmp_base = np.mean(noise.phase[:header_length])
                     self.nos_amp = np.append(self.nos_amp, noise.phase-tmp_base)
                     nos_a1_range = np.split(noise.phase-tmp_base, a1_split_indices)
                     nos_a2_range = np.split(noise.phase-tmp_base, a2_split_indices)
-                    self.nos_ohno_array = np.append(self.nos_ohno_array, np.array([np.sum(seg) for seg in nos_a1_range[:-1]])*dt)
-                    self.nos_ohno_array = np.append(self.nos_ohno_array, np.array([np.sum(seg) for seg in nos_a2_range[:-1]])*dt)
-                    self.nos_waste_tot += (len(nos_a1_range[-1])+len(nos_a2_range[-1]))*dt
+                    self.nos_ohno_array = np.append(self.nos_ohno_array, np.array([np.sum(seg) for seg in nos_a1_range[2:-1]])*dt)
+                    self.nos_ohno_array = np.append(self.nos_ohno_array, np.array([np.sum(seg) for seg in nos_a2_range[2:-1]])*dt)
+                    self.nos_waste_tot += (len(nos_a1_range[1])+len(nos_a1_range[-1]))*dt
 
     def plot_tod_histogram(self, **kwargs):
         options = {'save':False,
@@ -1012,14 +1101,14 @@ class Taudraw():
         'sn_amp_max':self.sig_amp.max(),
         'ohno_area_bins':int(round(np.log2(len(self.sig_ohno_array)+len(self.nos_ohno_array))+1)),
         'ohno_area_min':self.sig_ohno_array.min()*1e6,
-        'ohno_area_max':self.sig_ohno_array.max()*1e6,
+        'ohno_area_max':self.nos_ohno_array.max()*1e6,
         'cut':[0]}
         options.update(kwargs)
 
         sig_amp_w = np.ones(len(self.sig_amp))/self.sig_tot
         nos_amp_w = np.ones(len(self.nos_amp))/self.nos_tot
-        sig_ohno_w = np.ones(len(self.sig_ohno_array))/(self.sig_tot-self.sig_waste_tot)
-        nos_ohno_w = np.ones(len(self.nos_ohno_array))/(self.nos_tot-self.nos_waste_tot)
+        sig_ohno_w = 100*np.ones(len(self.sig_ohno_array))/(self.sig_tot-self.sig_waste_tot)
+        nos_ohno_w = 100*np.ones(len(self.nos_ohno_array))/(self.nos_tot-self.nos_waste_tot)
         
         fig_sn_amp = self.plt_obj.figure('sn_amp_hist')
         ax_sn_amp = fig_sn_amp.add_subplot(111)
@@ -1033,17 +1122,105 @@ class Taudraw():
         sig_amp_n_bins = np.hstack((sig_amp_n.reshape(-1,1), sig_amp_bins[:-1].reshape(-1,1)))
         nos_amp_n_bins = np.hstack((nos_amp_n.reshape(-1,1), nos_amp_bins[:-1].reshape(-1,1)))
         amp_n_bins = np.hstack((sig_amp_n_bins, nos_amp_n_bins))
-        self.plt_obj.legend()
+        sig_amp_entries = len(self.sig_amp)
+        nos_amp_entries = len(self.nos_amp)
+        sig_amp_mean = np.mean(self.sig_amp)
+        nos_amp_mean = np.mean(self.nos_amp)
+        sig_amp_sig = np.std(self.sig_amp)
+        nos_amp_sig = np.std(self.nos_amp)
+        columns = ['signal', 'noise']
+        rows = ['Entries', 'mean', 'std']
+        sn_amp_data = [['{0:d}/{1:.2f} s'.format(sig_amp_entries, self.sig_tot), '{0:d}/{1:.2f} s'.format(nos_amp_entries, self.nos_tot)], ['{0:.2e} rad'.format(sig_amp_mean), '{0:.2e} rad'.format(nos_amp_mean)], ['{0:.2e} rad'.format(sig_amp_sig), '{0:.2e} rad'.format(nos_amp_sig)]]
+        self.plt_obj.table(
+            cellText=sn_amp_data,
+            cellLoc='center',
+            colWidths=[0.3, 0.3],
+            colLabels=columns,
+            rowLabels=rows,
+            rowLoc='center',
+            loc='bottom', 
+            bbox=[0.10,-0.35, 0.80, 0.18],
+            zorder=10
+        )
+        self.plt_obj.legend(loc='upper left')
 
+        fig_sum_sig_area = self.plt_obj.figure('sum_area_sig_hist')
+        ax_sum_sig_area = fig_sum_sig_area.add_subplot(111)
+        ax_sum_sig_area.set_title('ohno\'s area (sum window length: {0:d}$\\mu$s) histogram : signal'.format(self.window_length))
+        ax_sum_sig_area.set_xlabel('area [rad $\\cdot \\mu$s]')
+        ax_sum_sig_area.set_ylabel('events/100s')
+        ax_sum_sig_area.set_yscale('log')
+        ax_sum_sig_area.grid(True, zorder=0)
+        ohno_sig_n, ohno_sig_bins, ohno_sig_patches = ax_sum_sig_area.hist(self.sig_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=sig_ohno_w,  color='steelblue', label='signal')
+        sig_ohno_entries = len(self.sig_ohno_array)
+        sig_ohno_mean = np.mean(self.sig_ohno_array)
+        sig_ohno_sig = np.std(self.sig_ohno_array)
+        rows = ['Entries', 'mean', 'std']
+        sig_ohno_data = [['{0:d}/{1:.2f} s'.format(sig_ohno_entries, self.sig_tot-self.sig_waste_tot)], ['{0:.2e} rad$\\cdot\\mu s$'.format(sig_ohno_mean*1e6)], ['{0:.2e} rad$\\cdot\\mu s$'.format(sig_ohno_sig*1e6)]]
+        self.plt_obj.table(
+            cellText=sig_ohno_data,
+            cellLoc='center',
+            colWidths=[0.3],
+            rowLabels=rows,
+            rowLoc='center',
+            loc='upper left',
+            bbox=[0.15, 0.80, 0.32, 0.18],
+            zorder=10
+        )
+        #self.plt_obj.legend()
+
+        fig_sum_nos_area = self.plt_obj.figure('sum_area_nos_hist')
+        ax_sum_nos_area = fig_sum_nos_area.add_subplot(111)
+        ax_sum_nos_area.set_title('ohno\'s area (sum window length: {0:d}$\\mu$s) histogram : noise'.format(self.window_length))
+        ax_sum_nos_area.set_xlabel('area [rad $\\cdot \\mu$s]')
+        ax_sum_nos_area.set_ylabel('events/100s')
+        ax_sum_nos_area.set_yscale('log')
+        ax_sum_nos_area.grid(True, zorder=0)
+        ohno_nos_n, ohno_nos_bins, ohno_nos_patches = ax_sum_nos_area.hist(self.nos_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=nos_ohno_w,  color='orange', label='noise')
+        nos_ohno_entries = len(self.nos_ohno_array)
+        nos_ohno_mean = np.mean(self.nos_ohno_array)
+        nos_ohno_sig = np.std(self.nos_ohno_array)
+        rows = ['Entries', 'mean', 'std']
+        nos_ohno_data = [['{0:d}/{1:.2f} s'.format(nos_ohno_entries, self.nos_tot-self.nos_waste_tot)], ['{0:.2e} rad$\\cdot\\mu s$'.format(nos_ohno_mean*1e6)], ['{0:.2e} rad$\\cdot\\mu s$'.format(nos_ohno_sig*1e6)]]
+        self.plt_obj.table(
+            cellText=nos_ohno_data,
+            cellLoc='center',
+            colWidths=[0.3],
+            rowLabels=rows,
+            rowLoc='center',
+            loc='upper left',
+            bbox=[0.15, 0.80, 0.32, 0.18],
+            zorder=10
+        )
+        #self.plt_obj.legend()
+
+        comb_ohno = np.append(self.sig_ohno_array, self.nos_ohno_array)
+        comb_tot = self.sig_tot+self.nos_tot-self.nos_waste_tot-self.sig_waste_tot
+        comb_ohno_w = 100*np.ones(len(comb_ohno))/comb_tot
         fig_sum_area = self.plt_obj.figure('sum_area_hist')
         ax_sum_area = fig_sum_area.add_subplot(111)
-        ax_sum_area.set_title('ohno\'s area (sum window length: 100$\\mu$s) stacked histogram')
+        ax_sum_area.set_title('ohno\'s area (sum window length: {0:d}$\\mu$s) histogram : signal + noise'.format(self.window_length))
         ax_sum_area.set_xlabel('area [rad $\\cdot \\mu$s]')
         ax_sum_area.set_ylabel('events/100s')
         ax_sum_area.set_yscale('log')
         ax_sum_area.grid(True, zorder=0)
-        ohno_n, ohno_bins, ohno_patches = ax_sum_area.hist((self.nos_ohno_array*1e6, self.sig_ohno_array*1e6), bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=(nos_ohno_w*100, sig_ohno_w*100), histtype='barstacked',  color=('orange', 'steelblue'), label=('noise', 'signal'))
-        self.plt_obj.legend()
+        ohno_n, ohno_bins, ohno_patches = ax_sum_area.hist(comb_ohno*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=comb_ohno_w,  color='green', label='combined')
+        comb_ohno_entries = len(comb_ohno)
+        comb_ohno_mean = np.mean(comb_ohno)
+        comb_ohno_sig = np.std(comb_ohno)
+        rows = ['Entries', 'mean', 'std']
+        comb_ohno_data = [['{0:d}/{1:.2f} s'.format(comb_ohno_entries, comb_tot)], ['{0:.2e} rad$\\cdot\\mu s$'.format(comb_ohno_mean*1e6)], ['{0:.2e} rad$\\cdot\\mu s$'.format(comb_ohno_sig*1e6)]]
+        self.plt_obj.table(
+            cellText=comb_ohno_data,
+            cellLoc='center',
+            colWidths=[0.3],
+            rowLabels=rows,
+            rowLoc='center',
+            loc='upper left',
+            bbox=[0.15, 0.80, 0.32, 0.18],
+            zorder=10
+        )
+        #self.plt_obj.legend(loc='upper right')
         
         if(options['save']==True):
             for fig_lb in self.plt_obj.get_figlabels():
