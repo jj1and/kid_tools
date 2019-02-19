@@ -214,60 +214,49 @@ class Gao():
         mod_theta = deepcopy(theta - options['std_theta'])
         delta_min_idx = deepcopy(np.argmin(np.abs(mod_theta)))
         delta_min = deepcopy(mod_theta[delta_min_idx])
-        diff_theta =  np.diff(mod_theta)
-        ther = 0.5
-        #smp_len = 10
-        jumped_indices = np.array([],dtype=int)
-        jump_cnt = 0
-        #diff_std = np.std(diff_theta[0:smp_len])
-        for i in range(len(diff_theta)):
-            if(np.abs(diff_theta[i]/(2*np.pi))>ther):
-                jumped_indices = np.append(jumped_indices, [i], axis=0)
-            else:
-                pass
-        #print("theta_jump found at ", jumped_indices)
-        for jumped_index in jumped_indices:
-            if(diff_theta[jumped_index]>0):
-                mod_theta[jumped_index+1:] -= 2*np.pi
-            elif(diff_theta[jumped_index]<0):
-                mod_theta[jumped_index+1:] += 2*np.pi
-            jump_cnt += 1
+        ther = 0.8
+        for i in range(len(mod_theta)-1):
+            diff = mod_theta[i+1]-mod_theta[i]
+            if(diff/(2*np.pi)>ther):
+                mod_theta[i+1] -= 2*np.pi
+            elif(diff/(2*np.pi)<-ther):
+                mod_theta[i+1] += 2*np.pi
+        mod_delta_min = deepcopy(mod_theta[delta_min_idx])
+        delta = delta_min -mod_delta_min
+        mod_theta += delta
 
-        if(mod_theta[delta_min_idx]<delta_min):
-            cnt = 0
-            while(mod_theta[delta_min_idx]<delta_min):
-                mod_theta += 2*np.pi
-                cnt += 1
-                if(cnt>1000):
-                    print('stacked!!')
-                    break
-        if(mod_theta[delta_min_idx]>delta_min):
-            cnt = 0
-            while(mod_theta[delta_min_idx]>delta_min):
-                mod_theta -= 2*np.pi
-                cnt += 1
-                if(cnt>1000):
-                    print('stacked!!')
-                    break
-        #print("theta_jump: " + str(jump_cnt)+ " times found")
+        # jumped_indices = np.array([],dtype=int)
+        # jump_cnt = 0
+        # for i in range(len(diff_theta)):
+        #     if(np.abs(diff_theta[i]/(2*np.pi))>ther):
+        #         jumped_indices = np.append(jumped_indices, [i], axis=0)
+        #     else:
+        #         pass
+        # #print("theta_jump found at ", jumped_indices)
+        # for jumped_index in jumped_indices:
+        #     if(diff_theta[jumped_index]>0):
+        #         mod_theta[jumped_index+1:] -= 2*np.pi
+        #     elif(diff_theta[jumped_index]<0):
+        #         mod_theta[jumped_index+1:] += 2*np.pi
+        #     jump_cnt += 1
 
-        # diff_max_index = np.argmax(diff_theta)
-        # smp_l = 1
-        # diff_std = np.std(np.array([diff_theta[diff_max_index-smp_l], diff_theta[diff_max_index+smp_l]]))
-        # if(np.abs(diff_theta[diff_max_index])>5*diff_std):
-        #     diff_max = diff_theta[diff_max_index]
-        #     thre= diff_max*0.8
-        #     jumped_indices = np.where(diff_theta>thre)
-        #     jump_cnt = 0
-        #     for jumped_index in jumped_indices[0]:
-        #         if(diff_theta[jumped_index]>0):
-        #             mod_theta[jumped_index+1:] -= 2*np.pi
-        #         elif(diff_theta[jumped_index]<0):
-        #             mod_theta[jumped_index+1:] += 2*np.pi
-        #         jump_cnt += 1
-        #     print("theta_jump: " + str(jump_cnt)+ " times found") 
-        #else:
-        #    pass
+        # if(mod_theta[delta_min_idx]<delta_min):
+        #     cnt = 0
+        #     while(mod_theta[delta_min_idx]<delta_min):
+        #         mod_theta += 2*np.pi
+        #         cnt += 1
+        #         if(cnt>1000):
+        #             print('stacked!!')
+        #             break
+        # if(mod_theta[delta_min_idx]>delta_min):
+        #     cnt = 0
+        #     while(mod_theta[delta_min_idx]>delta_min):
+        #         mod_theta -= 2*np.pi
+        #         cnt += 1
+        #         if(cnt>1000):
+        #             print('stacked!!')
+        #             break
+        
         return mod_theta
 
     def remove_tau_effect(self, I, Q, f, tau):
@@ -713,7 +702,9 @@ class Gaonep(Gao):
 
         super().__init__(ref_swp_fname, sg_freq)
 
-    def oncho_analisys(self, oncho_file_list, fr, qr):
+    def oncho_analisys(self, oncho_file_list, fr, qr, **kwargs):
+        options={'avoid_fine_fit':False}
+        options.update(kwargs)
         self.oncho_file_list = oncho_file_list
         
         tau_res = qr/(np.pi*fr)
@@ -727,18 +718,21 @@ class Gaonep(Gao):
         for ele in self.oncho_file_list:
             fname = ele[0]
             temp = ele[1]
-            # swp_data = np.genfromtxt(fname, delimiter=" ")
-            # tmp_I = swp_data[:,1]
-            # tmp_Q = swp_data[:,2]
-            # tmp_f = self.sg*1.0E6 + swp_data[:,0]
-            # tmp_fr_idx = np.abs(tmp_f-fr).argmin()
-            # tmp_xc_c, tmp_yc_c = self.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+            swp_data = np.genfromtxt(fname, delimiter=" ")
+            tmp_I = swp_data[:,1]
+            tmp_Q = swp_data[:,2]
+            tmp_f = self.sg*1.0E6 + swp_data[:,0]
+            tmp_fr_idx = np.abs(tmp_f-fr).argmin()
+            tmp_xc_c, tmp_yc_c = self.set_data_default_position(tmp_I, tmp_Q, tmp_f)
 
-            tmp_gao = Gaonep(fname, 5300)
-            tmp_gao.coarse_fit()
-            tmp_gao.fine_fit()
-            tmp_fr_idx = np.abs(tmp_gao.f-fr).argmin()
-            tmp_xc_c, tmp_yc_c = tmp_gao.set_data_default_position(tmp_gao.I, tmp_gao.Q, tmp_gao.f)
+            # tmp_gao = Gaonep(fname, self.sg)
+            # tmp_gao.coarse_fit()
+            # if(options['avoid_fine_fit']==False):
+            #     tmp_gao.fine_fit(**kwargs)
+            # elif(options['avoid_fine_fit']==True):
+            #     print("avoid fine fitting!!")
+            # tmp_fr_idx = np.abs(tmp_gao.f-fr).argmin()
+            # tmp_xc_c, tmp_yc_c = tmp_gao.set_data_default_position(tmp_gao.I, tmp_gao.Q, tmp_gao.f)
 
             tmp_theta = np.arctan2(tmp_yc_c, tmp_xc_c)
             if(cnt==0):
@@ -759,7 +753,7 @@ class Gaonep(Gao):
         phase_shift = phase_shift[sort] -phase_shift[sort[0]]
 
         grad = np.diff(phase_shift)
-        ther = 0.8
+        ther = 0.5
         for i in range(1, phase_shift.shape[0]-1):
             if(np.abs(grad[i])/(2*np.pi)>ther):
                 if(grad[i]<0):

@@ -262,7 +262,9 @@ class Nepdraw(Kidraw):
         self.oncho_file_list=[]
 
     def draw_oncho(self, oncho_file_list, **kwargs):
-        options = {'save':False}
+        options = {
+        'save':False,
+        'avoid_fine_fit':False}
         options.update(kwargs)
 
         self.oncho_file_list=oncho_file_list
@@ -275,10 +277,26 @@ class Nepdraw(Kidraw):
         ax.set_aspect('equal', 'datalim')
         ax.scatter(0, 0, label='center', color='k', marker='+')
 
+        fig2 = self.plt_obj.figure('oncho_amp')
+        ax2 = fig2.add_subplot(111)
+        ax2.grid(True)
+        ax2.set_title("oncho result(Amp.)")
+        ax2.set_xlabel("freq [MHz]")
+        ax2.set_ylabel("Amp. [dB]")
+
+        fig3 = self.plt_obj.figure('oncho_phase')
+        ax3 = fig3.add_subplot(111)
+        ax3.grid(True)
+        ax3.set_title("oncho result(Phase)")
+        ax3.set_xlabel("freq [MHz]")
+        ax3.set_ylabel("Phase [rad]")
+
         cnt = 0
         Tarray = []
         fname_list = []
         segments = []
+        amp_segments = []
+        phase_segments = []
         xlims = np.array([])
         ylims = np.array([])
         for ele in self.oncho_file_list:
@@ -288,53 +306,96 @@ class Nepdraw(Kidraw):
         Tmax = np.max(Tarray).reshape((1,-1))[0][0]
 
         for fname in fname_list:
-            # swp_data = np.genfromtxt(fname, delimiter=" ")
-            # tmp_I = swp_data[:,1]
-            # tmp_Q = swp_data[:,2]
+            swp_data = np.genfromtxt(fname, delimiter=" ")
+            tmp_I = swp_data[:,1]
+            tmp_Q = swp_data[:,2]
+            tmp_amp = np.sqrt(tmp_I**2 + tmp_Q**2)
+            tmp_log_amp = 10*np.log10(tmp_amp/tmp_amp[0])
 
-            # tmp_f = self.gao_obj.sg*1.0E6 + swp_data[:,0]
-            # tmp_fr_idx = np.abs(tmp_f-self.fr).argmin()
-            # oncho_xc_c, oncho_yc_c = self.gao_obj.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+            tmp_f = self.gao_obj.sg*1.0E6 + swp_data[:,0]
+            tmp_fr_idx = np.abs(tmp_f-self.fr).argmin()
+            oncho_xc_c, oncho_yc_c = self.gao_obj.set_data_default_position(tmp_I, tmp_Q, tmp_f)
+            tmp_phase = np.arctan2(oncho_yc_c, oncho_xc_c)
+            if(cnt==0):
+                std_theta = tmp_phase[tmp_fr_idx]
+            tmp_phase_c = self.gao_obj.phase_smoother(tmp_phase, std_theta=std_theta)
 
-            tmp_gao = gaopy.Gaonep(fname, 5300)
-            tmp_gao.coarse_fit(**kwargs)
-            tmp_gao.fine_fit(**kwargs)
-            tmp_fr_idx = np.abs(tmp_gao.f-self.fr).argmin()
-            oncho_xc_c, oncho_yc_c = tmp_gao.set_data_default_position(tmp_gao.I, tmp_gao.Q, tmp_gao.f)
+            # tmp_gao = gaopy.Gaonep(fname, self.gao_obj.sg)
+            # tmp_gao.coarse_fit()
+            # if(options['avoid_fine_fit']==False):
+            #     tmp_gao.fine_fit(**kwargs)
+            # elif(options['avoid_fine_fit']==True):
+            #     print("avoid fine fitting!!")
+            # tau, xc, yc, r, fr, Qr, phi_0 = tmp_gao.get_fit_params()
+            # tmp_fr_idx = np.abs(tmp_gao.f-self.fr).argmin()
+            # fr_idx = np.abs(tmp_gao.f-fr).argmin()
+            # oncho_xc_c, oncho_yc_c = tmp_gao.set_data_default_position(tmp_gao.I, tmp_gao.Q, tmp_gao.f)
+            # tmp_phase = np.arctan2(oncho_yc_c, oncho_xc_c)
+            # tmp_phase_c = self.gao_obj.phase_smoother(tmp_phase, std_theta=tmp_phase[fr_idx])
 
-            segments.append(list(zip(oncho_xc_c, oncho_yc_c)))
+
+            amp_segments.append(np.column_stack([tmp_f*1E-6, tmp_log_amp]))
+            phase_segments.append(np.column_stack([tmp_f*1E-6, tmp_phase_c]))
+            segments.append(np.column_stack([oncho_xc_c, oncho_yc_c]))
 
             if(cnt==0):
                 ax.scatter(oncho_xc_c[tmp_fr_idx], oncho_yc_c[tmp_fr_idx], label='fr point',color='w', edgecolor='k', zorder=2, s=8)
+                ax3.scatter(tmp_f[tmp_fr_idx]*1E-6, tmp_phase_c[tmp_fr_idx], label='fr point',color='w', edgecolor='k', zorder=6, s=8)
                 xlims = [[np.min(oncho_xc_c), np.max(oncho_xc_c)]]
                 ylims = [[np.min(oncho_yc_c), np.max(oncho_yc_c)]]
-            else:
+                amp_ylims = [[np.min(tmp_log_amp), np.max(tmp_log_amp)]]
+                phase_ylims= [[np.min(tmp_phase_c), np.max(tmp_phase_c)]]
+                amp_phase_xlim = [np.min(tmp_f*1E-6), np.max(tmp_f*1E-6)]
+            elif(cnt>0):
                 ax.scatter(oncho_xc_c[tmp_fr_idx], oncho_yc_c[tmp_fr_idx], color='w', edgecolor='k', zorder=2, s=8)
+                ax3.scatter(tmp_f[tmp_fr_idx]*1E-6, tmp_phase_c[tmp_fr_idx], label='fr point',color='w', edgecolor='k', zorder=6, s=8)
                 xlims = np.append(xlims, [[np.min(oncho_xc_c), np.max(oncho_xc_c)]], axis=0)
                 ylims = np.append(ylims, [[np.min(oncho_yc_c), np.max(oncho_yc_c)]], axis=0)
+                amp_ylims = np.append(amp_ylims, [[np.min(tmp_log_amp), np.max(tmp_log_amp)]], axis=0)
+                phase_ylims = np.append(phase_ylims, [[np.min(tmp_phase_c), np.max(tmp_phase_c)]], axis=0)
             #ax.plot(oncho_xc_c, oncho_yc_c, marker='o', markersize=2, zorder=1, color=cm.inferno((Tarray[cnt]-Tmin)/(Tmax-Tmin)))
             cnt += 1
         expand = 1.05
+        expand_f_range = (amp_phase_xlim[1]-amp_phase_xlim[0])*0.05
+        amp_max = 0.50
+        expand_amp_min = 1.05
         ax.set_xlim(xlims[:, 0].min()*expand, xlims[:, 1].max()*expand)
         ax.set_ylim(ylims[:, 0].min()*expand, ylims[:, 1].max()*expand)
+        ax2.set_xlim(amp_phase_xlim[0]-expand_f_range, amp_phase_xlim[1]+expand_f_range)
+        ax2.set_ylim(amp_ylims[:, 0].min()*expand_amp_min, 0.50)
+        ax3.set_xlim(amp_phase_xlim[0]-expand_f_range, amp_phase_xlim[1]+expand_f_range)
+        ax3.set_ylim(phase_ylims[:, 0].min()*expand, phase_ylims[:, 1].max()*expand)
         norm = colors.Normalize(Tmin, Tmax)
         line_segments = LineCollection(segments, linewidths=2, cmap='inferno', norm=norm, zorder=1)
         line_segments.set_array(Tarray)
+        amp_line_segments = LineCollection(amp_segments, linewidths=2, cmap='inferno', norm=norm, zorder=1)
+        amp_line_segments.set_array(Tarray)
+        phase_line_segments = LineCollection(phase_segments, linewidths=2, cmap='inferno', norm=norm, zorder=1)
+        phase_line_segments.set_array(Tarray)
         ax.add_collection(line_segments)
         axcb = fig.colorbar(line_segments)
         axcb.set_label("Temperature (mK)")
-        self.plt_obj.gca().set_aspect('equal', adjustable='box')
+        #self.plt_obj.gca().set_aspect('equal', adjustable='box')
+
+        ax2.add_collection(amp_line_segments)
+        axcb2 = fig2.colorbar(amp_line_segments)
+        axcb2.set_label("Temperature (mK)")
+
+        ax3.add_collection(phase_line_segments)
+        axcb3 = fig3.colorbar(phase_line_segments)
+        axcb3.set_label("Temperature (mK)")
 
         if(options['save']==True):
-            save_fig = self.plt_obj.figure('oncho')
-            save_fig.savefig(self.save_dir+'oncho.pdf', dpi=200)
+            for fig_lb in self.plt_obj.get_figlabels():
+                save_fig = self.plt_obj.figure(fig_lb)
+                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
             
 
     def plot_phase_shift(self, oncho_file_list, N0, delta_0, volume, **kwargs):
         options = {'save':False}
         options.update(kwargs)
 
-        self.gao_obj.oncho_analisys(oncho_file_list, self.fr, self.Qr)
+        self.gao_obj.oncho_analisys(oncho_file_list, self.fr, self.Qr, **kwargs)
         self.gao_obj.Temp2Nqp(N0, delta_0, volume)
 
         fig_TvsPS = self.plt_obj.figure('T_vs_PS')
