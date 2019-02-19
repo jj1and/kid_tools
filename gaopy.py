@@ -214,7 +214,7 @@ class Gao():
         mod_theta = deepcopy(theta - options['std_theta'])
         delta_min_idx = deepcopy(np.argmin(np.abs(mod_theta)))
         delta_min = deepcopy(mod_theta[delta_min_idx])
-        ther = 0.8
+        ther = 0.5
         for i in range(len(mod_theta)-1):
             diff = mod_theta[i+1]-mod_theta[i]
             if(diff/(2*np.pi)>ther):
