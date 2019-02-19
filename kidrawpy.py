@@ -850,6 +850,7 @@ class Taudraw():
 
     def plot_histogram(self, **kwargs):
         options = {'save':False,
+        'log_yaxis':True,
         'tau_bins':int(round(np.log2(len(self.combined_df['phase_tau']))+1)),
         'tau_min':0.0,
         'tau_max':self.combined_df['phase_tau'].max()*1e6,
@@ -879,6 +880,10 @@ class Taudraw():
         ax_tau.set_xlabel('$\\tau$ [$\\mu s$]')
         ax_tau.set_ylabel('events/hour')
         ax_tau.grid(True, zorder=0)
+        if(options['log_yaxis']==True):
+            ax_tau.set_yscale('log')
+        elif(options['log_yaxis']==False):
+            pass
         tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5, color='steelblue', weights=tot_weights)
         tau_n_bins = np.hstack((tau_n.reshape(-1,1), tau_bins[:-1].reshape(-1,1)))
         tau_entries = len(cut_df['phase_tau'].index)
@@ -916,6 +921,10 @@ class Taudraw():
         ax_amp.set_xlabel('Amp. [rad]')
         ax_amp.set_ylabel('events/hour')
         ax_amp.grid(True, zorder=0)
+        if(options['log_yaxis']==True):
+            ax_amp.set_yscale('log')
+        elif(options['log_yaxis']==False):
+            pass
         amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5, color='crimson', weights=tot_weights)
         amp_n_bins = np.hstack((amp_n.reshape(-1,1), amp_bins[:-1].reshape(-1,1)))
         amp_entries = len(cut_df['phase_Amp'].index)
@@ -939,6 +948,10 @@ class Taudraw():
         ax_area.set_xlabel('area [$\\mu s \\cdot$ rad]')
         ax_area.set_ylabel('events/hour')
         ax_area.grid(True, zorder=0)
+        if(options['log_yaxis']==True):
+            ax_area.set_yscale('log')
+        elif(options['log_yaxis']==False):
+            pass
         area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5, color='green', weights=tot_weights)
         area_n_bins = np.hstack((area_n.reshape(-1,1), area_bins[:-1].reshape(-1,1)))
         area_entries = len(cut_df['phase_area'].index)
