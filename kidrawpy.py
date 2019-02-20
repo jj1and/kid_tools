@@ -995,6 +995,7 @@ class Taudraw():
         options = {
         'cut':[0]
         }
+        options.update(kwargs)
 
         if(len(options['cut'])==1):
             cut_df = pd.concat([self.combined_df, self.failed_combined_df], axis=0, sort=False)
