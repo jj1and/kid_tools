@@ -1051,8 +1051,8 @@ class Taudraw():
         svsr_cbar.set_label('events/hour')
         svsr_ymin, svsr_ymax = ax_svsr.get_ylim()
         svsr_xmin, svsr_xmax = ax_svsr.get_xlim()
-        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(self.std_ratio_ther, svsr_ymax+1.0, 3) ,color='r', linestyle=':', zorder=10, label='threshold')
-        ax_svsr.plot(np.linspace(self.fh_skew_ther, svsr_xmax+1.0, 3), self.std_ratio_ther*np.ones(3) ,color='r', linestyle=':', zorder=10)
+        ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(svsr_ymin-1.0, self.std_ratio_ther, 3) ,color='r', linestyle=':', zorder=10, label='threshold')
+        ax_svsr.plot(np.linspace(svsr_xmin-1.0, self.fh_skew_ther, 3), self.std_ratio_ther*np.ones(3) ,color='r', linestyle=':', zorder=10)
         ax_svsr.set_ylim(svsr_ymin, svsr_ymax)
         ax_svsr.set_xlim(svsr_xmin, svsr_xmax)
         self.plt_obj.table(
