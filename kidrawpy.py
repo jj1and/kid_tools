@@ -849,22 +849,42 @@ class Taudraw():
 
 
     def plot_histogram(self, **kwargs):
+        # options = {'save':False,
+        # 'log_yaxis':True,
+        # 'tau_bins':int(round(np.log2(len(self.combined_df['phase_tau']))+1)),
+        # 'tau_min':0.0,
+        # 'tau_max':self.combined_df['phase_tau'].max()*1e6,
+        # 'amp_bins':int(round(np.log2(len(self.combined_df['phase_Amp']))+1)),
+        # 'amp_min':self.combined_df['phase_Amp'].min(),
+        # 'amp_max':self.combined_df['phase_Amp'].max(),
+        # 'area_bins':int(round(np.log2(len(self.combined_df['phase_area']))+1)),
+        # 'area_min':0.0,
+        # 'area_max':self.combined_df['phase_area'].max()*1e6,
+        # 'avt_tau_min_max':[0.0, self.combined_df['phase_tau'].max()*1e6],
+        # 'avt_amp_min_max':[self.combined_df['phase_Amp'].min(), self.combined_df['phase_Amp'].max()],
+        # 'avt_bins':[int(round(np.log2(len(self.combined_df['phase_tau']))+1)), int(round(np.log2(len(self.combined_df['phase_Amp']))+1))],
+        # 'cut':[0]}
         options = {'save':False,
-        'log_yaxis':True,
-        'tau_bins':int(round(np.log2(len(self.combined_df['phase_tau']))+1)),
+        'log_yaxis':False,
+        'tau_bins':100,
         'tau_min':0.0,
         'tau_max':self.combined_df['phase_tau'].max()*1e6,
-        'amp_bins':int(round(np.log2(len(self.combined_df['phase_Amp']))+1)),
+        'amp_bins':100,
         'amp_min':self.combined_df['phase_Amp'].min(),
         'amp_max':self.combined_df['phase_Amp'].max(),
-        'area_bins':int(round(np.log2(len(self.combined_df['phase_area']))+1)),
+        'area_bins':100,
         'area_min':0.0,
         'area_max':self.combined_df['phase_area'].max()*1e6,
         'avt_tau_min_max':[0.0, self.combined_df['phase_tau'].max()*1e6],
         'avt_amp_min_max':[self.combined_df['phase_Amp'].min(), self.combined_df['phase_Amp'].max()],
-        'avt_bins':[int(round(np.log2(len(self.combined_df['phase_tau']))+1)), int(round(np.log2(len(self.combined_df['phase_Amp']))+1))],
-        'cut':[0]}
+        'avt_bins':[50, 50],
+        'cut':[0],
+        'tag_name':""}
         options.update(kwargs)
+        err_kwgs = {'linestyle':':',
+        'linewidth':1,
+        'capsize':2,
+        'zorder':5.5}
 
         if(len(options['cut'])==1):
             cut_df = self.combined_df
@@ -876,15 +896,23 @@ class Taudraw():
 
         fig_tau = self.plt_obj.figure('tau_hist')
         ax_tau = fig_tau.add_subplot(111)
-        ax_tau.set_title('$\\tau$ histogram')
+        ax_tau.set_title('$\\tau$ distoribution (events per hour)')
         ax_tau.set_xlabel('$\\tau$ [$\\mu s$]')
-        ax_tau.set_ylabel('events/hour')
+        ax_tau.set_ylabel('events/bin')
+        ax_tau.tick_params(direction='in')
         ax_tau.grid(True, zorder=0)
         if(options['log_yaxis']==True):
             ax_tau.set_yscale('log')
         elif(options['log_yaxis']==False):
             pass
         tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5, color='steelblue', weights=tot_weights)
+        # tau_n, tau_bins = np.histogram(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']))
+        # tau_err = np.sqrt(tau_n)
+        # tau_bin_width = tau_bins[1]-tau_bins[0]
+        # tau_bin_centers = (tau_bins[1:]+tau_bins[:-1])/2
+        # ax_tau.bar(tau_bin_centers, tau_n/self.tot_h, width=tau_bin_width, yerr=tau_err/self.tot_h, zorder=5, color='steelblue')
+        
+        
         tau_n_bins = np.hstack((tau_n.reshape(-1,1), tau_bins[:-1].reshape(-1,1)))
         tau_entries = len(cut_df['phase_tau'].index)
         tau_mean = np.mean(cut_df['phase_tau'])
@@ -917,9 +945,9 @@ class Taudraw():
 
         fig_amp = self.plt_obj.figure('amp_hist')
         ax_amp = fig_amp.add_subplot(111)
-        ax_amp.set_title('Amp. histogram')
+        ax_amp.set_title('Amp. distribution (events per hour)')
         ax_amp.set_xlabel('Amp. [rad]')
-        ax_amp.set_ylabel('events/hour')
+        ax_amp.set_ylabel('events/bin')
         ax_amp.grid(True, zorder=0)
         if(options['log_yaxis']==True):
             ax_amp.set_yscale('log')
@@ -944,9 +972,9 @@ class Taudraw():
 
         fig_area = self.plt_obj.figure('area_hist')
         ax_area = fig_area.add_subplot(111)
-        ax_area.set_title('Area histogram')
+        ax_area.set_title('Area distribution (events per hour)')
         ax_area.set_xlabel('area [$\\mu s \\cdot$ rad]')
-        ax_area.set_ylabel('events/hour')
+        ax_area.set_ylabel('events/bin')
         ax_area.grid(True, zorder=0)
         if(options['log_yaxis']==True):
             ax_area.set_yscale('log')
@@ -971,24 +999,24 @@ class Taudraw():
 
         fig_tvsAmp = self.plt_obj.figure('tvsAmp_hist')
         ax_tvsAmp = fig_tvsAmp.add_subplot(111)
-        ax_tvsAmp.set_title('$\\tau$ vs Amp histogram')
+        ax_tvsAmp.set_title('$\\tau$ vs Amp histogram (events per hour)')
         ax_tvsAmp.set_xlabel('$\\tau$. [$\\mu$ s]')
         ax_tvsAmp.set_ylabel('Amp. [rad]')
         ax_tvsAmp.grid(True, zorder=0)
         tvsAmp_h, tau_tvsAmp_xedges, tau_tvsAmp_yedges, tvsAmp_im = ax_tvsAmp.hist2d(cut_df['phase_tau']*1e6, cut_df['phase_Amp'], bins=options['avt_bins'], range=[options['avt_tau_min_max'], options['avt_amp_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         tvsAmp_im.cmap.set_under('w')
         tvsAmp_cbar = self.plt_obj.colorbar(tvsAmp_im, ax=ax_tvsAmp)
-        tvsAmp_cbar.set_label('events/hour')
+        tvsAmp_cbar.set_label('events/bin')
 
 
         if(options['save']==True):
             for fig_lb in self.plt_obj.get_figlabels():
                 save_fig = self.plt_obj.figure(fig_lb)
                 self.plt_obj.tight_layout()
-                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200, figsize=(10,10))
-            np.savetxt(self.save_dir+'amp_hist.dat', amp_n_bins, delimiter=' ', header='n bins')
-            np.savetxt(self.save_dir+'tau_hist.dat', tau_n_bins, delimiter=' ', header='n bins')
-            np.savetxt(self.save_dir+'area_hist.dat', area_n_bins, delimiter=' ', header='n bins')
+                save_fig.savefig(self.save_dir+ options['tag_name'] +fig_lb+'.pdf', dpi=200, figsize=(10,10))
+            np.savetxt(self.save_dir+ options['tag_name'] +'amp_hist.dat', amp_n_bins, delimiter=' ', header='n bins')
+            np.savetxt(self.save_dir+ options['tag_name'] +'tau_hist.dat', tau_n_bins, delimiter=' ', header='n bins')
+            np.savetxt(self.save_dir+ options['tag_name'] +'area_hist.dat', area_n_bins, delimiter=' ', header='n bins')
 
 
     def plot_stats(self, **kwargs):
@@ -1034,7 +1062,8 @@ class Taudraw():
         'svA_bins':[int(round(np.log2(len(cut_df['fh_skew']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))],
         'srvA_Amp_min_max':[cut_df['phase_Amp'].min(), cut_df['phase_Amp'].max()],
         'srvA_sr_min_max':[cut_df['std_ratio'].min(), cut_df['std_ratio'].max()],
-        'srvA_bins':[int(round(np.log2(len(cut_df['std_ratio']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))]
+        'srvA_bins':[int(round(np.log2(len(cut_df['std_ratio']))+1)), int(round(np.log2(len(cut_df['phase_Amp']))+1))],
+        'tag_name':""
         }
         options.update(options2)
         options.update(kwargs)
@@ -1043,13 +1072,13 @@ class Taudraw():
 
         fig_svsr = self.plt_obj.figure('svsr_hist')
         ax_svsr = fig_svsr.add_subplot(111)
-        ax_svsr.set_title('first half skew vs std_ratio histogram')
+        ax_svsr.set_title('first half skew vs std_ratio histogram (events per hour)')
         ax_svsr.set_ylabel('std ratio [no unit]')
         ax_svsr.set_xlabel('first half skew [no unit]')
         ax_svsr.grid(True, zorder=0)
         svsr_h, svsr_xedges, svsr_yedges, svsr_im = ax_svsr.hist2d(cut_df['fh_skew'], cut_df['std_ratio'], bins=options['svsr_bins'], range=[options['svsr_skew_min_max'], options['svsr_sr_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         svsr_cbar = self.plt_obj.colorbar(svsr_im, ax=ax_svsr)
-        svsr_cbar.set_label('events/hour')
+        svsr_cbar.set_label('events/bin')
         svsr_ymin, svsr_ymax = ax_svsr.get_ylim()
         svsr_xmin, svsr_xmax = ax_svsr.get_xlim()
         ax_svsr.plot(self.fh_skew_ther*np.ones(3), np.linspace(svsr_ymin-1.0, self.std_ratio_ther, 3) ,color='r', linestyle=':', zorder=10, label='threshold')
@@ -1082,13 +1111,13 @@ class Taudraw():
 
         fig_svt = self.plt_obj.figure('svt_hist')
         ax_svt = fig_svt.add_subplot(111)
-        ax_svt.set_title('first half skew vs $\\tau$ histogram')
+        ax_svt.set_title('first half skew vs $\\tau$ histogram (events per hour)')
         ax_svt.set_ylabel('$\\tau$ [$\\mu$ s]')
         ax_svt.set_xlabel('first half skew. [no unit]')
         ax_svt.grid(True, zorder=0)
         svt_h, svt_xedges, svt_yedges, svt_im = ax_svt.hist2d(cut_df['fh_skew'], cut_df['phase_tau']*1e6, bins=options['svt_bins'], range=[options['svt_skew_min_max'], options['svt_tau_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         svt_cbar = self.plt_obj.colorbar(svt_im, ax=ax_svt)
-        svt_cbar.set_label('events/hour')
+        svt_cbar.set_label('events/bin')
         svt_ymin, svt_ymax = ax_svt.get_ylim()
         ax_svt.plot(self.fh_skew_ther*np.ones(3), np.linspace(svt_ymin-1.0, svt_ymax+1.0, 3), color='r', linestyle=':', label='skew threshold', zorder=6)
         ax_svt.set_ylim(svt_ymin, svt_ymax)
@@ -1096,13 +1125,13 @@ class Taudraw():
 
         fig_srvt = self.plt_obj.figure('srvt_hist')
         ax_srvt = fig_srvt.add_subplot(111)
-        ax_srvt.set_title('std ratio vs $\\tau$ histogram')
+        ax_srvt.set_title('std ratio vs $\\tau$ histogram (events per hour)')
         ax_srvt.set_ylabel('$\\tau$ [$\\mu$ s]')
         ax_srvt.set_xlabel('std ratio [no unit]')
         ax_srvt.grid(True, zorder=0)
         srvt_h, srvt_xedges, srvt_yedges, srvt_im = ax_srvt.hist2d(cut_df['std_ratio'], cut_df['phase_tau']*1e6, bins=options['srvt_bins'], range=[options['srvt_sr_min_max'], options['srvt_tau_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         srvt_cbar = self.plt_obj.colorbar(srvt_im, ax=ax_srvt)
-        srvt_cbar.set_label('events/hour')
+        srvt_cbar.set_label('events/bin')
         srvt_ymin, srvt_ymax = ax_srvt.get_ylim()
         ax_srvt.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvt_ymin-1.0, srvt_ymax+1.0, 3), color='r', linestyle=':', label='std ratio threshold', zorder=6)
         ax_srvt.set_ylim(srvt_ymin, srvt_ymax)
@@ -1110,13 +1139,13 @@ class Taudraw():
 
         fig_svA = self.plt_obj.figure('svA_hist')
         ax_svA = fig_svA.add_subplot(111)
-        ax_svA.set_title('first half skew vs Amp. histogram')
+        ax_svA.set_title('first half skew vs Amp. histogram (events per hour)')
         ax_svA.set_ylabel('Amp. [rad]')
         ax_svA.set_xlabel('first half skew. [no unit]')
         ax_svA.grid(True, zorder=0)
         svA_h, svA_xedges, svA_yedges, svA_im = ax_svA.hist2d(cut_df['fh_skew'], cut_df['phase_Amp'], bins=options['svA_bins'], range=[options['svA_skew_min_max'], options['svA_Amp_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         svA_cbar = self.plt_obj.colorbar(svA_im, ax=ax_svA)
-        svA_cbar.set_label('events/hour')
+        svA_cbar.set_label('events/bin')
         svA_ymin, svA_ymax = ax_svA.get_ylim()
         ax_svA.plot(self.fh_skew_ther*np.ones(3), np.linspace(svA_ymin-1.0, svA_ymax+1.0, 3), color='r', linestyle=':', label='skew threshold', zorder=6)
         ax_svA.set_ylim(svA_ymin, svA_ymax)
@@ -1124,13 +1153,13 @@ class Taudraw():
 
         fig_srvA = self.plt_obj.figure('srvA_hist')
         ax_srvA = fig_srvA.add_subplot(111)
-        ax_srvA.set_title('std ratio vs Amp. histogram')
+        ax_srvA.set_title('std ratio vs Amp. histogram (events per hour)')
         ax_srvA.set_ylabel('Amp. [rad]')
         ax_srvA.set_xlabel('std ratio [no unit]')
         ax_srvA.grid(True, zorder=0)
         srvA_h, srvA_xedges, srvA_yedges, srvA_im = ax_srvA.hist2d(cut_df['std_ratio'], cut_df['phase_Amp'], bins=options['srvA_bins'], range=[options['srvA_sr_min_max'], options['srvA_Amp_min_max']], cmap='jet', zorder=5, weights=tot_weights, cmin=1.0E-7)
         srvA_cbar = self.plt_obj.colorbar(srvA_im, ax=ax_srvA)
-        srvA_cbar.set_label('events/hour')
+        srvA_cbar.set_label('events/bin')
         srvA_ymin, srvA_ymax = ax_srvA.get_ylim()
         ax_srvA.plot(self.std_ratio_ther*np.ones(3), np.linspace(srvA_ymin-1.0, srvA_ymax+1.0, 3), color='r', linestyle=':', label='std ratio threshold', zorder=6)
         ax_srvA.set_ylim(srvA_ymin, srvA_ymax)
@@ -1140,7 +1169,7 @@ class Taudraw():
             for fig_lb in self.plt_obj.get_figlabels():
                 save_fig = self.plt_obj.figure(fig_lb)
                 self.plt_obj.tight_layout()
-                save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
+                save_fig.savefig(self.save_dir+options['tag_name'] +fig_lb+'.pdf', dpi=200)
 
     def tod_analyze(self, **kwargs):
         header_length=100
@@ -1177,7 +1206,8 @@ class Taudraw():
         'ohno_area_bins':int(round(np.log2(len(self.sig_ohno_array)+len(self.nos_ohno_array))+1)),
         'ohno_area_min':self.sig_ohno_array.min()*1e6,
         'ohno_area_max':self.nos_ohno_array.max()*1e6,
-        'cut':[0]}
+        'cut':[0],
+        'tag_name':""}
         options.update(kwargs)
 
         sig_amp_w = np.ones(len(self.sig_amp))/self.sig_tot
@@ -1189,7 +1219,7 @@ class Taudraw():
         ax_sn_amp = fig_sn_amp.add_subplot(111)
         ax_sn_amp.set_title('signal and noise phase shift histgram (base subtructed)')
         ax_sn_amp.set_xlabel('Phase [rad]')
-        ax_sn_amp.set_ylabel('events/$\\mu s$')
+        ax_sn_amp.set_ylabel('events/bin/s')
         ax_sn_amp.set_yscale('log')
         ax_sn_amp.grid(True, zorder=0)
         sig_amp_n, sig_amp_bins, sig_amp_patches = ax_sn_amp.hist(self.sig_amp, bins=options['sn_amp_bins'], range=(options['sn_amp_min'], options['sn_amp_max']), zorder=5, label='signal', weights=sig_amp_w, color='steelblue', histtype='step')
@@ -1223,7 +1253,7 @@ class Taudraw():
         ax_sum_sig_area = fig_sum_sig_area.add_subplot(111)
         ax_sum_sig_area.set_title('ohno\'s area (sum window length: {0:d}$\\mu$s) histogram : signal'.format(self.window_length))
         ax_sum_sig_area.set_xlabel('area [rad $\\cdot \\mu$s]')
-        ax_sum_sig_area.set_ylabel('events/100s')
+        ax_sum_sig_area.set_ylabel('events/bin/100s')
         ax_sum_sig_area.set_yscale('log')
         ax_sum_sig_area.grid(True, zorder=0)
         ohno_sig_n, ohno_sig_bins, ohno_sig_patches = ax_sum_sig_area.hist(self.sig_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=sig_ohno_w,  color='steelblue', label='signal')
@@ -1248,7 +1278,7 @@ class Taudraw():
         ax_sum_nos_area = fig_sum_nos_area.add_subplot(111)
         ax_sum_nos_area.set_title('ohno\'s area (sum window length: {0:d}$\\mu$s) histogram : noise'.format(self.window_length))
         ax_sum_nos_area.set_xlabel('area [rad $\\cdot \\mu$s]')
-        ax_sum_nos_area.set_ylabel('events/100s')
+        ax_sum_nos_area.set_ylabel('events/bin/100s')
         ax_sum_nos_area.set_yscale('log')
         ax_sum_nos_area.grid(True, zorder=0)
         ohno_nos_n, ohno_nos_bins, ohno_nos_patches = ax_sum_nos_area.hist(self.nos_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=nos_ohno_w,  color='orange', label='noise')
@@ -1276,7 +1306,7 @@ class Taudraw():
         ax_sum_area = fig_sum_area.add_subplot(111)
         ax_sum_area.set_title('ohno\'s area (sum window length: {0:d}$\\mu$s) histogram : signal + noise'.format(self.window_length))
         ax_sum_area.set_xlabel('area [rad $\\cdot \\mu$s]')
-        ax_sum_area.set_ylabel('events/100s')
+        ax_sum_area.set_ylabel('events/bin/100s')
         ax_sum_area.set_yscale('log')
         ax_sum_area.grid(True, zorder=0)
         ohno_n, ohno_bins, ohno_patches = ax_sum_area.hist(comb_ohno*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=comb_ohno_w,  color='green', label='combined')
@@ -1302,5 +1332,5 @@ class Taudraw():
                 save_fig = self.plt_obj.figure(fig_lb)
                 self.plt_obj.tight_layout()
                 save_fig.savefig(self.save_dir+fig_lb+'.pdf', dpi=200)
-            np.savetxt(self.save_dir + 'tod_amp_hist.dat', amp_n_bins, delimiter=' ', header='signal_n signal_bins noise_n noise_bins')
+            np.savetxt(self.save_dir +options['tag_name'] + 'tod_amp_hist.dat', amp_n_bins, delimiter=' ', header='signal_n signal_bins noise_n noise_bins')
 
