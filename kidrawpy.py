@@ -908,7 +908,7 @@ class Taudraw():
             ax_tau.set_yscale('log')
         elif(options['log_yaxis']==False):
             ax_tau.yaxis.set_minor_locator(AutoMinorLocator(5))
-        tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5, color='steelblue', weights=tot_weights)
+        tau_n, tau_bins, tau_patches = ax_tau.hist(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']), zorder=5, color='steelblue', weights=tot_weights, histtype='step')
         # tau_n, tau_bins = np.histogram(cut_df['phase_tau']*1e6, bins=options['tau_bins'], range=(options['tau_min'], options['tau_max']))
         # tau_err = np.sqrt(tau_n)
         # tau_bin_width = tau_bins[1]-tau_bins[0]
@@ -959,7 +959,7 @@ class Taudraw():
             ax_amp.set_yscale('log')
         elif(options['log_yaxis']==False):
             ax_amp.yaxis.set_minor_locator(AutoMinorLocator(5))
-        amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5, color='crimson', weights=tot_weights)
+        amp_n, amp_bins, amp_patches = ax_amp.hist(cut_df['phase_Amp'], bins=options['amp_bins'], range=(options['amp_min'], options['amp_max']), zorder=5, color='crimson', weights=tot_weights, histtype='step')
         amp_n_bins = np.hstack((amp_n.reshape(-1,1), amp_bins[:-1].reshape(-1,1)))
         amp_entries = len(cut_df['phase_Amp'].index)
         amp_mean = np.mean(cut_df['phase_Amp'])
@@ -989,7 +989,7 @@ class Taudraw():
             ax_area.set_yscale('log')
         elif(options['log_yaxis']==False):
             ax_area.yaxis.set_minor_locator(AutoMinorLocator(5))
-        area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5, color='green', weights=tot_weights)
+        area_n, area_bins, area_patches = ax_area.hist(cut_df['phase_area']*1e6, bins=options['area_bins'], range=(options['area_min'], options['area_max']), zorder=5, color='green', weights=tot_weights, histtype='step')
         area_n_bins = np.hstack((area_n.reshape(-1,1), area_bins[:-1].reshape(-1,1)))
         area_entries = len(cut_df['phase_area'].index)
         area_mean = np.mean(cut_df['phase_area'])
@@ -1297,7 +1297,7 @@ class Taudraw():
         ax_sum_sig_area.tick_params(direction='in', zorder=5.5)
         ax_sum_sig_area.tick_params(direction='in', which='minor', zorder=5.5)
         ax_sum_sig_area.grid(True, zorder=0)
-        ohno_sig_n, ohno_sig_bins, ohno_sig_patches = ax_sum_sig_area.hist(self.sig_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=sig_ohno_w,  color='steelblue', label='signal')
+        ohno_sig_n, ohno_sig_bins, ohno_sig_patches = ax_sum_sig_area.hist(self.sig_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=sig_ohno_w,  color='steelblue', label='signal', histtype='step')
         sig_ohno_entries = len(self.sig_ohno_array)
         sig_ohno_mean = np.mean(self.sig_ohno_array)
         sig_ohno_sig = np.std(self.sig_ohno_array)
@@ -1326,7 +1326,7 @@ class Taudraw():
         ax_sum_nos_area.tick_params(direction='in', zorder=5.5)
         ax_sum_nos_area.tick_params(direction='in', which='minor', zorder=5.5)
         ax_sum_nos_area.grid(True, zorder=0)
-        ohno_nos_n, ohno_nos_bins, ohno_nos_patches = ax_sum_nos_area.hist(self.nos_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=nos_ohno_w,  color='orange', label='noise')
+        ohno_nos_n, ohno_nos_bins, ohno_nos_patches = ax_sum_nos_area.hist(self.nos_ohno_array*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=nos_ohno_w,  color='orange', label='noise', histtype='step')
         nos_ohno_entries = len(self.nos_ohno_array)
         nos_ohno_mean = np.mean(self.nos_ohno_array)
         nos_ohno_sig = np.std(self.nos_ohno_array)
@@ -1358,7 +1358,7 @@ class Taudraw():
         ax_sum_area.tick_params(direction='in', zorder=5.5)
         ax_sum_area.tick_params(direction='in', which='minor', zorder=5.5)
         ax_sum_area.grid(True, zorder=0)
-        ohno_n, ohno_bins, ohno_patches = ax_sum_area.hist(comb_ohno*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=comb_ohno_w,  color='green', label='combined')
+        ohno_n, ohno_bins, ohno_patches = ax_sum_area.hist(comb_ohno*1e6, bins=options['ohno_area_bins'], range=(options['ohno_area_min'], options['ohno_area_max']), zorder=5, weights=comb_ohno_w,  color='green', label='combined', histtype='step')
         comb_ohno_entries = len(comb_ohno)
         comb_ohno_mean = np.mean(comb_ohno)
         comb_ohno_sig = np.std(comb_ohno)
