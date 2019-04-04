@@ -1060,6 +1060,10 @@ class Gao():
             PSDの周波数(1列目)と振幅のPSDデータ(2列目)。dBとついているのは関係ないです
         dBcomb_freq_phase : numpy.array
             PSDの周波数(1列目)と位相のPSDデータ(2列目)。dBとついているのは関係ないです
+
+        See Also
+        --------
+        tod2psd : 実際にPSD(またはPS)を計算する関数
         '''
 
         options = {"psd_unit":"liner",
@@ -1107,7 +1111,43 @@ class Gao():
 
 
 class Gaonep(Gao):
+    '''
+    NEPを計算するためのGaoクラスの派生クラス
+
+    Attributes
+    ----------
+    oncho_fit_range : numpy.array
+        Nqpと位相のデータのフィット範囲
+    Tarray : numpy.ndarray
+        温度データ
+    Nqp : numpy.ndarray
+        準粒子数のデータ
+    phase_shift : numpy.ndarray
+        位相シフトのデータ
+    nep : numpy.ndarray
+        NEPデータ
+    lmfit_element_props : lmfit.Parameters
+        KIDの特性(N0, delta(0), volume)を保存しているオブジェクト
+    lmfit_oncho_init_params : lmfit.Parameters
+        Nqpと位相のデータのフィットの初期値。
+        dth_dNqpとphase_biasの値を保持している。
+    lmfit_oncho_result : lmfit.minimizer.MinimizerResult
+        Nqpと位相のデータのフィット
+        dth_dNqpとphase_biasの値を保持している。
+    lmfit_nep_props : lmfit.Parameters
+        NEPを計算するために必要なパラメータ。
+        eta, delta, dth_dNqp, tau_qp, tau_resの値を保持している。
+    '''
+
     def __init__(self, ref_swp_fname, sg_freq=4000):
+        """
+        Parameters
+        ----------
+        ref_swp_fname : string
+            全ての温調データを変換するために参照するパスも含んだsweepファイル名
+        sg_freq : int or float, defalt 4000
+            SGの周波数(MHz単位)
+        """
         self.oncho_fit_range = np.array([])
         self.Tarray = np.ndarray([])
         self.Tstart_stop = np.ndarray([])
@@ -1122,6 +1162,27 @@ class Gaonep(Gao):
         super().__init__(ref_swp_fname, sg_freq)
 
     def oncho_analisys(self, oncho_file_list, fr, qr, **kwargs):
+        '''
+        oncho_file_list : list
+            温調データのリスト。[[パスを含めたファイル名, 温度(mK)], ...]
+        fr : float
+            全ての温調データを変換するために参照するsweepデータでの共振周波数。単位はHz
+        qr : float
+            全ての温調データを変換するために参照するsweepデータでのQr
+        Keyword Arguments
+        -----------------
+        avoid_fine_fit : bool, default False
+            Trueにするとfine fittingを行わない
+        
+        Returns
+        -------
+        Tarray : numpy.array
+            温度データ
+        Tstart_stop : numpy.array
+            各温調データの測定開始時と終了時の温度のnumpy.array
+        phase_shift : 
+            位相データ
+        '''
         options={'avoid_fine_fit':False}
         options.update(kwargs)
         self.oncho_file_list = oncho_file_list
@@ -1188,6 +1249,23 @@ class Gaonep(Gao):
         return Tarray, Tstart_stop, phase_shift
 
     def Temp2Nqp(self, N0, delta_0, volume):
+        '''
+        温度を準粒子数に変換する関数
+
+        Parameters
+        ----------
+        N0 : float
+            素子中の準粒子数密度。(単位は[um^-3 * eV^-1])
+        delta_0 : float
+            0Kでの超伝導状態のエネルギーギャップ
+        volume : float
+            体積(単位は[um^3])
+
+        Returns
+        -------
+        Nqp : numpy.array
+            準粒子数
+        '''
         Nqp = np.array([])
         self.lmfit_element_props.add_many(
         ('N0', N0, False, None, None, None, None), 
@@ -1198,14 +1276,67 @@ class Gaonep(Gao):
         return Nqp
 
     def load_psd(self, amp_psd_fname, phase_psd_fname, skip_header=1):
+        '''
+        外部ファイルからPSDデータを読み込む関数。
+
+        Parameters
+        ----------
+        amp_psd_fname : string
+            振幅のPSDデータのパスを含んだファイル名
+        phase_psd_fname : string
+            位相のPSDデータのパスを含んだファイル名
+        skip_header : int ,default 1
+            PSDデータのヘッダーの行数
+        '''
         self.comb_freq_amp = np.genfromtxt(amp_psd_fname, delimiter=" ", skip_header=skip_header)
         self.comb_freq_phase = np.genfromtxt(phase_psd_fname, delimiter=" ", skip_header=skip_header)
 
     def get_psd(self, tod_freq, tod_file_list, **kwargs):
+        '''
+        ToDデータからPSDを計算する関数。kwargsはcomb_psd関数に渡される。
+
+        Parameters
+        ----------
+        tod_freq : float
+            ToD測定の測定周波数
+        tod_file_list : list
+            [[パスを含めたToDファイル名, サンプリングレート(ksps)], ...]
+
+        See Also
+        --------
+            comb_psd : 複数のToDファイルからPSDデータを計算する関数
+        '''
         self.comb_psd(tod_freq, tod_file_list=tod_file_list, **kwargs)
 
 
     def calc_nep(self, delta, eta, tau_qp, fit_Nqp_min, fit_Nqp_max, init_dth_dNqp=1.0, init_phase_bias=0.0):
+        '''
+        NEPを計算する関数
+
+        Parameters
+        ----------
+        delta : float
+            超伝導エネルギーギャップ。単位はeV
+        eta : float
+            absorption efficiency (from Mazin's D_theorem : 0.57)
+        tau_qp : float
+            準粒子の寿命。単位はsec
+        fit_Nqp_min : 
+            準粒子数と位相シフトのデータのフィッティングの下限値
+        fit_Nqp_max : 
+            準粒子数と位相シフトのデータのフィッティングの上限値
+        init_dth_dNqp : float, default 1.0
+            準粒子数と位相シフトのデータのフィッティングの傾きの初期値
+        init_phase_bias : float, default 0.0
+            準粒子数と位相シフトのデータのフィッティングのy切片の初期値
+
+        Returns
+        -------
+        comb_freq_phase[:, 0] : numpy.array
+            NEPの周波数。単位はHz
+        nep : numpy.array
+            NEP
+        '''
         self.oncho_fit_range = np.array([fit_Nqp_min, fit_Nqp_max])
         self.lmfit_oncho_init_params.add_many(
         ('dth_dNqp', init_dth_dNqp, True, None, None, None, None), 
@@ -1235,16 +1366,40 @@ class Gaonep(Gao):
         return self.comb_freq_phase[:, 0], nep
 
     def save_nep(self, phase_nep_fname='phase_nep.dat'):
+        '''
+        計算したNEPを保存する関数
+
+        Parameters
+        ----------
+        phase_nep_fname : string, default phase_nep.dat
+            保存先のパスを含まないファイル名
+        '''
         freq_nep = np.hstack((self.comb_freq_phase[:, 0].reshape(-1,1), self.nep.reshape(-1,1)))
         np.savetxt(self.save_dir+phase_nep_fname, freq_nep, delimiter=' ', header='freq(Hz) NEP[W/Hz^1/2]')
 
     def save_Nqp_PS(self, Nqp_PS_fname='oncho_result.dat'):
+        '''
+        計算した位相シフトと準粒子数および温度データを保存する関数
+
+        Parameters
+        ----------
+        Nqp_PS_fname : string, default oncho_result.dat
+            保存先のパスを含まないファイル名
+        '''
         T_Terr = np.hstack((self.Tarray.reshape(-1,1), self.Tstart_stop))
         Nqp_PS = np.hstack((self.Nqp.reshape(-1,1), self.phase_shift.reshape(-1,1)))
         T_Terr_Nqp_PS = np.hstack((T_Terr, Nqp_PS))
         np.savetxt(self.save_dir+Nqp_PS_fname, T_Terr_Nqp_PS, delimiter=' ', header='T[mK] T_start[mK] T_stop[mK] Nqp phase_shift[rad]')
 
     def save_soshi_params(self, save_fname='soshi_props.csv'):
+        '''
+        NEPなどを計算するために用いた素子の各種値をCSVに保存する関数
+
+        Parameters
+        ----------
+        save_fname : string, default soshi_props.csv
+            保存先のパスを含まないファイル名
+        '''
         with open(self.save_dir+save_fname, 'w', newline="") as f  :
             csv_header = ['para_name', 'value', 'sigma']
             csv_rows = [csv_header]
@@ -1267,6 +1422,18 @@ class Gaonep(Gao):
                 writer.writerow(row)
 
     def output_soshi_params(self, save_fname='soshi_props.csv'):
+        '''
+        NEPなどを計算するために用いた素子の各種値をCSVに保存する関数
+        リストで値を返す(ぶっちゃけいらない関数)
+
+        save_fname : string, default soshi_props.csv
+            保存先のパスを含まないファイル名
+
+        Returns
+        -------
+        csv_rows : list
+            パラメータ名とその値がセットになったリスト
+        '''
         with open(self.save_dir+save_fname, 'w', newline="") as f  :
             csv_header = ['para_name', 'value', 'sigma']
             csv_rows = [csv_header]
