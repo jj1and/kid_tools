@@ -937,12 +937,24 @@ class Gao():
 
         Keyword Arguments
         -----------------
-        load_fit_file : string, default "none", 
+        load_fit_file : string, default "none"
             get_fit_paramsに渡すオプション。
         psd_method : string, default "welch"
             "welch" : PSDの計算にWelch法(平均periodogram法)を用いる
-            "periodgram" : PSDの計算にperiodgram法を用いる
-        segment_rate : int
+            "periodgram" : PSDの計算にperiodgram法を用いる(プログラムの信頼性が低いので注意)
+        segment_rate : int , default 50
+            フーリエ変換をする際のWindowの重なる割合
+        ps_option : bool, defaut False
+            Trueの場合、パワースペクトル(PS)を結果を戻り値にする
+
+        Returns
+        -------
+        freq_amp : numpy.array
+            PSDの周波数(1列目)と振幅のPSDデータ(2列目)を返す(ps_optionがFalseの場合)
+        freq_phase : numpy.array
+            PSDの周波数(1列目)と位相のPSDデータ(2列目)を返す(ps_optionがFalseの場合)
+        freq_ps : numpy.array
+            PSの周波数(1列目)と振幅のPSデータ(2列目)と位相のPSデータ(3列目)を返す(ps_optionがTrueの場合)
 
         See Also
         --------
@@ -1023,6 +1035,33 @@ class Gao():
             sys.exit("Error! invailed ps_option")
 
     def comb_psd(self, tod_freq, tod_file_list=[["tod_1ksps.dat", 1.0],["tod_100ksps.dat", 100.0], ["tod_1Msps.dat", 1000.0]], **kwargs):
+        '''
+        複数のToDからPSDまたはPSDを計算する関数。kwargsには tod2psd()メソッドのkwargsも渡すことができる
+
+        Parameters
+        ----------
+        tod_freq : float
+            ToD測定をおこなった周波数(単位はHz)
+        tod_file_list : list
+            ToDファイルのパスを含めたファイル名とサンプリングレート(単位はksps)のリストのリスト
+        
+        Keyword Arguments
+        -----------------
+        psd_unit : string, default "liner"
+            "liner" : 計算結果をdB単位にせずにそのまま返す
+            "dB" : 計算結果をdB単位で返す ( 10*numpy.log10(linerの計算結果) )
+        save_to_menber : bool, default True
+            Trueの場合、計算結果をメンバ変数として保存する
+            Falseの場合は保存しない
+
+        Returns
+        -------
+        dBcomb_freq_amp : numpy.array
+            PSDの周波数(1列目)と振幅のPSDデータ(2列目)。dBとついているのは関係ないです
+        dBcomb_freq_phase : numpy.array
+            PSDの周波数(1列目)と位相のPSDデータ(2列目)。dBとついているのは関係ないです
+        '''
+
         options = {"psd_unit":"liner",
         "save_to_menber":True}
         options.update(kwargs)
@@ -1052,6 +1091,16 @@ class Gao():
         return dBcomb_freq_amp, dBcomb_freq_phase
 
     def save_comb_psd(self, amp_psd_fname='amp_psd.dat', phase_psd_fname='phase_psd.dat'):
+        '''
+        PSDデータをスペース区切りファイルに保存する関数
+
+        Parameters
+        ----------
+        amp_psd_fname : string, default 'amp_psd.dat'
+            振幅のPSDデータのパスを含まないファイル名
+        phase_psd_fname : string, default 'phase_psd.dat'
+            位相のPSDデータのパスを含まないファイル名
+        '''
         np.savetxt(self.save_dir+amp_psd_fname, self.comb_freq_amp, delimiter=' ', header='freq[Hz] amp_PSD[dBc/Hz]')
         np.savetxt(self.save_dir+phase_psd_fname, self.comb_freq_phase, delimiter=' ', header='freq[Hz] phase_PSD[dBc/Hz]')
 
