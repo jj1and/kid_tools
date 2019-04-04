@@ -9,7 +9,56 @@ from scipy import signal
 from lmfit import minimizer, Parameters, report_fit
 
 class Gao():
+    """
+    IQデータを振幅・位相データに変換する。またPSDを計算する。
+
+    Attributes
+    ----------
+    swp_file_name : string
+        パスも含んだsweepファイル名。コンストラクタで必要。
+    save_dir : string, default './'
+        ファイルの保存先ディレクトリ
+    sg : int or float
+        SGの周波数 (MHz単位)。コンストラクタで必要。
+    tod_freq : float
+        ToD測定を行った際の周波数(Hz単位)。
+    fine_fit_redchi_ther : float, default 1.0
+        fine fittingが成功したか判定するためのreduced chi squareの値。
+        この値より大きい場合失敗とみなす。
+    comb_freq_amp : numpy.ndarray
+        PSD周波数(1列目)と振幅(2列目)のPSDデータのndarray
+    comb_freq_phase : numpy.ndarray
+        PSD周波数(1列目)と位相(2列目)のPSDデータのndarray
+    theta_fit_range : numpy.array
+        coarse fittingの範囲の [最小周波数, 最大周波数]というnumpy.array
+    fine_fit_range : numpy.array
+        fine fittingの範囲の [最小周波数, 最大周波数]というnumpy.array
+    lmfit_init_circle_params : lmfit.Parameters
+        coarse fittingの結果の値を格納したlmfitのParameterオブジェクト。
+        xc, yc, rの値を保持している。
+    lmfit_init_theta_params : lmfit.Parameters
+        coarse fittingを行うための初期値。
+        theta_0, Qr, frの値を保持している。
+    lmfit_theta_result : lmfit.minimizer.MinimizerResult
+        coarse fittingのfit結果を保持するlmfitのminimizerのMinimizerResultオブジェクト。
+        theta_0, Qr, frの値を保持している。
+    lmfit_init_params : lmfit.Parameters
+        fine fittingを行うための初期値。
+        r_a(aの実部), i_a(aの虚部), tau, fr, qr, qc, phi_0の値を保持している。
+    lmfit_result :  lmfit.minimizer.MinimizerResult
+        fine fittingのfit結果を保持するlmfitのminimizerのMinimizerResultオブジェクト。
+        r_a(aの実部), i_a(aの虚部), tau, fr, qr, qc, phi_0の値を保持している。
+        加えて、qrとqcから算出したqiの値も保持している。
+    """
     def __init__(self, sweep_file_name="sweep.dat",sg_freq=4000):
+        """
+        Parameters
+        ----------
+        sweep_file_name : string
+            パスも含んだsweepファイル名
+        sg_freq : int or float, defalt 4000
+            SGの周波数(MHz単位)
+        """
         self.swp_file_name = sweep_file_name
         self.save_dir = './'
         self.sg = sg_freq
@@ -39,9 +88,55 @@ class Gao():
         self.phase = all_phase
 
     def set_save_dir(self, save_dir='./'):
+        """
+        各種ファイルの保存先を設定する。
+
+        Parameters
+        ----------
+        save_dir : string
+            ファイルの保存先ディレクトリ
+        """
         self.save_dir = save_dir
 
     def get_fit_params(self, *fit_params, **kwargs):
+        """
+        フィットパラメータを返す関数
+        fine fittingが失敗している場合はcoarse fittingの結果を返す。
+
+        Other Parameters
+        ----------------
+        *fit_params : list
+            tau, xc, yc, r, fr, Qr, Qc, phi_0のリストを代入すると
+            それらの値を返す
+
+        Keyword Arguments
+        -----------------
+        load_fit_file : string, default "none"
+            パスを含めたfit parameterが保存されたファイル名を代入すると
+            そのparamterを返す
+
+        Raises
+        ------
+        AttributeError
+            fine fittingが行われていない場合このエラーを返す。
+
+        Returns
+        -------
+        tau : float
+            ケーブルディレイの値
+        xc : float
+            移動前の円の中心のx座標
+        yc : float
+            移動前の円の中心のy座標
+        r : float
+            移動前の円の半径
+        fr : float
+            共振周波数。単位はHz
+        Qr : float
+            Q値
+        phi_0 : float
+            位相差。単位はradian
+        """
         options={"load_fit_file":"none"}
         options.update(kwargs)
         circle_params_dict = self.lmfit_circle_params.valuesdict()
@@ -86,6 +181,24 @@ class Gao():
         return tau, xc, yc, r, fr, Qr, phi_0
 
     def save_fine_fit_params(self, save_fname1='fine_fit_params.csv', save_fname2='fine_fit_circle_params.csv'):
+        """
+        fine fittingの結果をcsv形式で保存する関数。
+
+        Parameters
+        ----------
+        save_fname1 : string, default 'fine_fit_params.csv'
+            パスまで含めたfine fittingの結果を保存するファイル名
+            r_a(aの実部), i_a(aの虚部), tau, fr, qr, qc, qi, phi_0の値を保存する。
+        save_fname2 : string, default 'fine_fit_circle_params.csv'
+            パスまで含めたfine fittingの結果を保存するファイル名
+            xc, yc, rの値を保存する
+        
+        Raises
+        ------
+        AttributeError
+            fine fittingが行われていない場合エラーを出す。
+
+        """
         try:
             with open(self.save_dir+save_fname1, 'w', newline="") as f:
                 csv_header = ['para_name', 'value', 'sigma', 'init_val']
@@ -137,6 +250,18 @@ class Gao():
 
 
     def save_coarse_fit_params(self, save_fname1='coarse_fit_params.csv', save_fname2='coarse_fit_circle_params.csv'):
+        """
+        coarse fittingの結果をcsv形式で保存する関数。
+
+        Parameters
+        ----------
+        save_fname1 : string, default 'coarse_fit_params.csv'
+            パスまで含めたcoarse fittingの結果を保存するファイル名
+            r_a(aの実部), i_a(aの虚部), tau, fr, qr, qc, qi, phi_0の値を保存する。
+        save_fname2 : string, default 'coarse   _fit_circle_params.csv'
+            パスまで含めたcoarse fittingの結果を保存するファイル名
+            xc, yc, rの値を保存する
+        """
         with open(self.save_dir+save_fname1, 'w', newline="") as f  :
             csv_header = ['para_name', 'value']
             csv_rows = [csv_header]
@@ -159,6 +284,19 @@ class Gao():
                 writer.writerow(row)
 
     def output_fine_params(self):
+        """
+        fine fittingの結果をリスト形式で返す関数。
+        ぶっちゃけいらない
+
+        Returns
+        -------
+        params_rows : list of float
+            fine fittingの結果のうち、
+            r_a(aの実部), i_a(aの虚部), tau, fr, qr, qc, qi, phi_0の結果のリストを返す
+        circ_params_rows : list of float
+            fine fittingの結果のうち、
+            xc, yc, rの結果のリストを返す
+        """
         params_header = ['para_name', 'value', 'sigma', 'init_val']
         params_rows = [params_header]
         circ_params_header = ['para_name', 'value']
@@ -193,6 +331,19 @@ class Gao():
     
 
     def output_coarse_params(self):
+        """
+        coarse fittingの結果をリスト形式で返す関数。
+        ぶっちゃけいらない
+
+        Returns
+        -------
+        params_rows : list of float
+            coarse fittingの結果のうち、
+            r_a(aの実部), i_a(aの虚部), tau, fr, qr, qc, qi, phi_0の結果のリストを返す
+        circ_params_rows : list of float
+            coarse fittingの結果のうち、
+            xc, yc, rの結果のリストを返す
+        """
         params_header = ['para_name', 'value']
         params_rows = [params_header]
         val_dict = self.lmfit_init_params.valuesdict()
@@ -209,6 +360,24 @@ class Gao():
 
 
     def phase_smoother(self, theta, **kwargs):
+        """
+        計算した位相のジャンプを取り除く関数
+
+        Parameters
+        ----------
+        theta : numpy.array
+            なめらかにする前の位相データ
+        
+        Keyword Arguments
+        -----------------
+        std_theta : float
+            始点にしたい角度の値(radian)
+
+        Returns
+        -------
+        theta : numpy.array
+            なめらかにした位相データ
+        """
         options = {'std_theta':theta[0]}
         options.update(kwargs)
         mod_theta = deepcopy(theta - options['std_theta'])
@@ -260,6 +429,27 @@ class Gao():
         return mod_theta
 
     def remove_tau_effect(self, I, Q, f, tau):
+        """
+        ケーブルディレイを取り除く関数
+
+        Parameters
+        ----------
+        I : numpy.array
+            Iデータ
+        Q : numpy.array
+            Qデータ
+        f : numpy.array
+            周波数データ。単位はHz
+        tau : float
+            ケーブルディレイの値であるtau。
+            単位はsec
+
+        Returns
+        x : numpy.array
+            ケーブルディレイを除いたx成分
+        y : numpy.array
+            ケーブルディレイを除いたy成分
+        """
         #calc cable delay effect by using tau value
         I_tau_effect = np.cos(2.0*np.pi*f*tau)
         Q_tau_effect = np.sin(2.0*np.pi*f*tau)
@@ -270,6 +460,24 @@ class Gao():
         return x, y
 
     def calc_xc_yc(self, x, y):
+        """
+        ケーブルディレイを取り除いたsweepデータから円の中心の座標を計算する関数
+
+        Parameters
+        ----------
+        x : numpy.array
+            ケーブルディレイを除いたx成分
+        y : numpy.array
+            ケーブルディレイを除いたy成分
+
+        Returns
+        xc : float
+            円の中心のx座標
+        yc : float
+            円の中心のy座標
+        r : 円の半径
+            円の半径
+        """
         w = x**2 + y**2
         M = np.matrix(np.ones((4,4)))
         M[0,0] = np.sum(w**2)
@@ -320,6 +528,45 @@ class Gao():
 
 
     def set_data_default_position(self, I, Q, f, *fit_params, **kwargs):
+        """
+        sweepのIQデータのケーブルディレイ、円の中心への移動までをまとめて行う関数。
+
+        Parameters
+        ----------
+        I : numpy.array
+            Iデータ
+        Q : numpy.array
+            Qデータ
+        f : numpy.array
+            周波数データ。単位はHz
+
+        Other Parameters
+        ----------------
+        *fit_params : list
+            tau, xc, yc, r, fr, Qr, Qc, phi_0のリストを代入すると
+            それらの値を返す
+
+        Keyword Arguments
+        -----------------
+        coarse_fit : bool, default False
+            Trueにするとxc, ycを手動で代入できる
+        xc : float
+            coarse_fitオプションがTrueの時に代入できる
+        yc : float
+            coarse_fitオプションがTrueの時に代入できる
+
+        Returns
+        -------
+        xc_c : numpy.array
+            変換後のx成分
+        yc_c : numpy.array
+            変換後のy成分
+
+        See Also
+        --------
+        get_fit_params : fit parameterを返す関数
+
+        """
         options = {"coarse_fit":False,
                     "xc":0.0,
                     "yc":0.0}
@@ -342,6 +589,26 @@ class Gao():
         return xc_c, yc_c
 
     def set_fit_range(self, swp_data, fr_MHz, min_MHz, max_MHz):
+        """
+        coarse fittingの範囲を設定する関数
+
+
+        Parameters
+        ----------
+        swp_data : numpy.array
+            I, Q, fがセットになったnumpy.array
+        fr_MHz : float
+            フィット範囲の中心周波数。単位はMHz
+        min_MHz : float
+            フィット範囲の中心周波数から下限周波数までの周波数幅。単位はMHz
+        max_MHz : float
+            フィット範囲の中心周波数から上限周波数までの周波数幅。単位はMHz
+
+        Returns
+        -------
+        cut_swp_data : numpy.array       
+            フィット範囲でカットされたsweepデータセット
+        """
         fr_Hz = fr_MHz*1.0E6
         min_Hz = min_MHz*1.0E6
         max_Hz = max_MHz*1.0E6
@@ -354,6 +621,33 @@ class Gao():
         return cut_swp_data
 
     def set_fine_fit_range(self, I, Q, f, fr_MHz, min_MHz, max_MHz):
+        """
+        fine fittingの範囲を設定する関数
+
+        Parameters
+        ----------
+        fit_I : numpy.array
+            フィット範囲でカットするIデータ
+        fit_Q : numpy.array
+            フィット範囲でカットするQデータ
+        fit_f : numpy.array       
+            フィット範囲でカットする周波数データセット。単位はMHz
+        fr_MHz : float
+            フィット範囲の中心周波数。単位はMHz
+        min_MHz : float
+            フィット範囲の中心周波数から下限周波数までの周波数幅。単位はMHz
+        max_MHz : float
+            フィット範囲の中心周波数から上限周波数までの周波数幅。単位はMHz
+
+        Returns
+        -------
+        fit_I : numpy.array
+            フィット範囲でカットされたIデータ
+        fit_Q : numpy.array
+            フィット範囲でカットされたQデータ
+        fit_f : numpy.array       
+            フィット範囲でカットされた周波数データセット単位はMHz
+        """
         fr_Hz = fr_MHz*1.0E6
         min_Hz = min_MHz*1.0E6
         max_Hz = max_MHz*1.0E6
@@ -368,10 +662,31 @@ class Gao():
         return fit_I, fit_Q, fit_f
 
     def coarse_fit(self, **kwargs):
+        """
+        coarse fittingを実行する関数
+
+        Keyword Arguments
+        -----------------
+        cs_fit_range : bool, default False
+            Trueの場合coarse fittingの範囲を手動で決める
+        cs_fr_min_max : list of float
+            cs_fit_rangeがTrueの場合、
+            [fr_MHz, min_MHz, max_MHz]
+            というリストを代入する。
+        
+        Returns
+        -------
+        fit_params : list of float
+            tau, xc, yc, r, fr, Qr, phi_0の値を返す
+
+        See Also
+        --------
+        set_fit_range : coarse fittingの範囲を設定する関数
+
+        """
         print("excecuting coarse fit...")
         print("------------------------------------------")
-        options={"save_csv":False,
-                 "cs_fit_range":False,
+        options={"cs_fit_range":False,
                  "cs_fr_min_max":[4010.0, 1.5, 1.5]}
         options.update(kwargs)
 
@@ -505,10 +820,33 @@ class Gao():
         return fit_params
 
     def fine_fit(self, **kwargs):
+        """
+        fine fittingを実行する関数
+
+        Keyword Arguments
+        -----------------
+        fn_fit_range : bool, default False
+            Trueの場合coarse fittingの範囲を手動で決める
+        fn_fr_min_max : list of float
+            fn_fit_rangeがTrueの場合、
+            [fr_MHz, min_MHz, max_MHz]
+            というリストを代入する。
+        red_chi_ther : float, default 1.0
+            fine fittingの判定条件。デフォルトは1.0より大きいと
+            失敗とみなす
+        
+        Returns
+        -------
+        fit_params : list of float
+            tau, xc, yc, r, fr, Qr, phi_0の値を返す
+
+        See Also
+        --------
+        set_fine_fit_range : fine fittingの範囲を設定する関数
+        """
         print("\nexecuting fine fit...")
         print("------------------------------------------")
-        options={"save_csv":False,
-                 "fn_fit_range":False,
+        options={"fn_fit_range":False,
                  "fn_fr_min_max":[self.lmfit_init_params.valuesdict()['fr']/1.0E6, 0.1, 0.2],
                  "red_chi_ther":self.fine_fit_redchi_ther}
         options.update(kwargs)
@@ -579,6 +917,38 @@ class Gao():
 
 
     def tod2psd(self, tod_file_name, sample_rate, tod_freq, *fit_params, **kwargs):
+        """
+        ToDをPSDデータに変換する関数
+
+        Parameters
+        ----------
+        tod_file_name : string
+            パスを含めたToDファイル名
+        sample_rate : float
+            サンプルレート。単位はksps
+        tod_freq : float
+            ToDを測定した周波数。単位はHz
+        
+        Other Parameters
+        ----------------
+        *fit_params : list
+            tau, xc, yc, r, fr, Qr, Qc, phi_0のリストを代入すると
+            それらの値を返す
+
+        Keyword Arguments
+        -----------------
+        load_fit_file : string, default "none", 
+            get_fit_paramsに渡すオプション。
+        psd_method : string, default "welch"
+            "welch" : PSDの計算にWelch法(平均periodogram法)を用いる
+            "periodgram" : PSDの計算にperiodgram法を用いる
+        segment_rate : int
+
+        See Also
+        --------
+        get_fit_params : fit paramterを返す関数
+
+        """
         #sample rate unit is kHz
         tod_data = np.genfromtxt(tod_file_name, delimiter=" ")
         num = tod_data[:, 0]
