@@ -116,6 +116,18 @@ class Kidraw():
         return [self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0]
 
     def plot_sweep(self, **kwargs):
+        """
+        フィッティング結果をプロットするための関数
+        プロットはIQ平面プロット、coarse fittingのFreq. vs Phase、４段グラフ(Freq vs I, Freq vs Q, Freq vs Amp, Freq vs Theta)をする。
+
+        Keyword Arguments
+        -----------------
+        save : bool, default False
+            Trueの場合、グラフをPDF形式で保存する
+        loc : string, default 'upper right'
+            matplotlib.figure.legend()に渡すkwargs
+            凡例の位置を決める。
+        """
         options = {'save':False,
         'loc':'upper right'}
         options.update(kwargs)
@@ -222,6 +234,22 @@ class Kidraw():
 
         
     def check_tod(self, tod_freq, tod_file_list=[["tod_1ksps.dat", 1.0], ["tod_100ksps.dat", 100.0], ["tod_1Msps.dat", 1000.0]], **kwargs):
+        """
+        ToDの変換が正常か確認するための関数
+        SweepのIQプロット上にToDを点プロットを行う
+
+        Parameters
+        ----------
+        tod_freq : float
+            ToD測定を行った周波数(単位はHz)
+        tod_file_list : list of list
+            ToDファイルのパスを含めたファイル名とサンプリングレート(単位はksps)のリストのリスト
+        
+        Keyword Arguments
+        -----------------
+        save : bool, default False
+            Trueの場合、PDF形式でデータを保存する。
+        """
         options = {'save':False}
         options.update(kwargs)
         
