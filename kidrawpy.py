@@ -11,7 +11,43 @@ from . import trgfit
 from . import functions as fn
 
 class Kidraw():
+    """
+    Gaoオブジェクトで解析した結果を表示するクラス
+
+    Attributes
+    ----------
+    fine_fit_success : bool, default False
+        fine fittingが成功したら場合はTrue
+    gao_obj : gaopy.Gao
+        Gaoオブジェクト。これを使って解析を行う
+    save_dir : string, default gao_obj.save_dir
+        グラフの保存先ディレクトリ
+    tau : float, default 0.0
+        準粒子の寿命(単位はsec)
+    xc : float, default 0.0
+        SweepデータのIQ平面状の円のx座標
+    yc : float, default 0.0
+        SweepデータのIQ平面状の円のy座標
+    r : float, default 0.0
+        SweepデータのIQ平面状の円の半径
+    fr : float, default 0.0
+        共振周波数(単位はHz)
+    Qr : float, default 0.0
+        Q値(共振の鋭さ)
+    phi_0 : float, default 0.0
+        位相ずれ(単位はradian)
+    plt_obj : matplotlib.pyplot
+        グラフ描画のためのmatplotlibオブジェクト
+    """
     def __init__(self, swp_file_name, sg_freq):
+        """
+        Parameters
+        ----------
+        ref_swp_fname : string
+            全IQデータを変換するために参照するパスも含んだsweepファイル名
+        sg_freq : int or float, defalt 4000
+            SGの周波数(MHz単位)
+        """
         self.fine_fit_success = False
         self.gao_obj = gaopy.Gao(swp_file_name, sg_freq)
         self.save_dir = self.gao_obj.save_dir
@@ -26,10 +62,39 @@ class Kidraw():
         self.plt_obj.style.use('default')
 
     def set_save_dir(self, save_dir='./'):
+        """
+        グラフなどの保存先ディレクトリを指定するための関数
+        インスタンスであるGaoクラスの保存ディレクトリにも適用される
+
+
+        Parameters
+        ----------
+        save_dir : string, default './'
+            保存先ディレクトリ 
+        """
         self.save_dir = save_dir
         self.gao_obj.set_save_dir(save_dir)
 
     def get_fit_params(self, **kwargs):
+        """
+        Gaoクラスのメソッドを使ってcoarse fittingとfine fittingを行う関数
+
+        Keyword Arguments
+        -----------------
+        avoid_fine_fit : bool, default False
+            Trueにした場合、fine fittingを行わない。
+            また、kwargsはGao.coarse_fit()とGao.fine_fit()に渡される
+
+        Returns
+        -------
+        [tau, xc, yc, r, fr, Qr, phi_0] : list of float
+            フィッティングの結果のリスト
+
+        See Also
+        --------
+        Gao.coarse_fit() : Gaoクラスのcoarse fittingのメソッド
+        Gao.fine_fit() : Gaoクラスのfine fittingのメソッド
+        """
         options = {'avoid_fine_fit':False}
         options.update(kwargs)
         coarse_fit_params = self.gao_obj.coarse_fit(**kwargs)
