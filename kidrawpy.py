@@ -115,6 +115,49 @@ class Kidraw():
 
         return [self.tau, self.xc, self.yc, self.r, self.fr, self.Qr, self.phi_0]
 
+    def plot_RawSweep(self, **kwargs):
+        """
+        Sweepデータを一切フィッティングせずにプロットする関数
+
+        Keyword Arguments
+        -----------------
+        save : bool, default False
+            Trueの場合、グラフをPDF形式で保存する
+        """
+        options = {'save':False}
+        options.update(kwargs)
+
+        fig_all = self.plt_obj.figure('swp_all')
+        ax_fI = fig_all.add_subplot(411)
+        ax_fI.grid(True)
+        ax_fI.set_xlabel("Frequancy[MHz]")
+        ax_fI.set_ylabel("I")
+        ax_fI.plot(self.gao_obj.f/1e6, self.gao_obj.I, label="freq vs I", color='k')
+
+        ax_fQ = fig_all.add_subplot(412)
+        ax_fQ.grid(True)
+        ax_fQ.set_xlabel("Frequancy[MHz]")
+        ax_fQ.set_ylabel("Q")
+        ax_fQ.plot(self.gao_obj.f/1e6, self.gao_obj.Q, label="freq vs Q", color='k')
+        
+        ax_fa = fig_all.add_subplot(413)
+        ax_fa.grid(True)
+        ax_fa.set_xlabel("Frequancy[MHz]")
+        ax_fa.set_ylabel("Amplitude[dB]")
+        ax_fa.plot(self.gao_obj.f/1e6, np.sqrt(self.gao_obj.I**2+self.gao_obj.Q**2), label="freq vs amplitude", color='k')
+
+        ax_fp = fig_all.add_subplot(414)
+        ax_fp.grid(True)
+        ax_fp.set_xlabel("Frequancy[MHz]")
+        ax_fp.set_ylabel("Phase[rad]")
+        ax_fp.plot(self.gao_obj.f/1e6, self.gao_obj.phase, label="freq vs phase", color='k')
+        fig_all.tight_layout()
+
+        if(options['save']==True):
+                save_fig = self.plt_obj.figure('swp_all')
+                save_fig.suptitle('all sweep results')
+                save_fig.savefig(self.save_dir+'all_sweep.pdf', dpi=200)
+
     def plot_sweep(self, **kwargs):
         """
         フィッティング結果をプロットするための関数
@@ -193,32 +236,6 @@ class Kidraw():
         ax_theta_func.plot(theta_func_plot_f/1e6, theta_func_plot_p-start_theta, label='fitting', color='crimson')
         self.plt_obj.legend(loc=options['loc'])
 
-        fig_all = self.plt_obj.figure('swp_all')
-        ax_fI = fig_all.add_subplot(411)
-        ax_fI.grid(True)
-        ax_fI.set_xlabel("Frequancy[MHz]")
-        ax_fI.set_ylabel("I")
-        ax_fI.plot(self.gao_obj.f/1e6, self.gao_obj.I, label="freq vs I", color='k')
-
-        ax_fQ = fig_all.add_subplot(412)
-        ax_fQ.grid(True)
-        ax_fQ.set_xlabel("Frequancy[MHz]")
-        ax_fQ.set_ylabel("Q")
-        ax_fQ.plot(self.gao_obj.f/1e6, self.gao_obj.Q, label="freq vs Q", color='k')
-        
-        ax_fa = fig_all.add_subplot(413)
-        ax_fa.grid(True)
-        ax_fa.set_xlabel("Frequancy[MHz]")
-        ax_fa.set_ylabel("Amplitude[dB]")
-        ax_fa.plot(self.gao_obj.f/1e6, amp_dB, label="freq vs amplitude", color='k')
-
-        ax_fp = fig_all.add_subplot(414)
-        ax_fp.grid(True)
-        ax_fp.set_xlabel("Frequancy[MHz]")
-        ax_fp.set_ylabel("Phase[rad]")
-        ax_fp.plot(self.gao_obj.f/1e6, smooth_phase, label="freq vs phase", color='k')
-        fig_all.tight_layout()
-
         if(options['save']==True):
                 save_fig = self.plt_obj.figure('IQ')
                 save_fig.suptitle('IQ plot')
@@ -227,10 +244,6 @@ class Kidraw():
                 save_fig = self.plt_obj.figure('theta_fit')
                 save_fig.suptitle('theta fit')
                 save_fig.savefig(self.save_dir+'theta_fit.pdf', dpi=200)
-
-                save_fig = self.plt_obj.figure('swp_all')
-                save_fig.suptitle('all sweep results')
-                save_fig.savefig(self.save_dir+'all_sweep.pdf', dpi=200)
 
         
     def check_tod(self, tod_freq, tod_file_list=[["tod_1ksps.dat", 1.0], ["tod_100ksps.dat", 100.0], ["tod_1Msps.dat", 1000.0]], **kwargs):
